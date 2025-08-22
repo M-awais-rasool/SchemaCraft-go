@@ -1,0 +1,649 @@
+basePath: /
+definitions:
+  controllers.ToggleUserStatusRequest:
+    properties:
+      is_active:
+        type: boolean
+    type: object
+  models.CreateSchemaRequest:
+    properties:
+      collection_name:
+        type: string
+      fields:
+        items:
+          $ref: '#/definitions/models.SchemaField'
+        minItems: 1
+        type: array
+    required:
+    - collection_name
+    - fields
+    type: object
+  models.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  models.SchemaField:
+    properties:
+      default: {}
+      description:
+        type: string
+      name:
+        type: string
+      required:
+        type: boolean
+      type:
+        description: string, number, boolean, date, object, array
+        type: string
+      visibility:
+        description: public, private
+        type: string
+    required:
+    - name
+    - type
+    type: object
+  models.SignupRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  models.UpdateMongoURIRequest:
+    properties:
+      database_name:
+        type: string
+      mongodb_uri:
+        type: string
+    required:
+    - database_name
+    - mongodb_uri
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@schemacraft.com
+    name: SchemaCraft Support
+    url: http://www.schemacraft.com/support
+  description: Dynamic Schema API Builder - Create APIs on the fly with custom schemas
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: SchemaCraft API
+  version: "1.0"
+paths:
+  /admin/stats:
+    get:
+      description: Get overall platform statistics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get platform statistics (Admin only)
+      tags:
+      - admin
+  /admin/users:
+    get:
+      description: Get all registered users with pagination
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 20, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get all users (Admin only)
+      tags:
+      - admin
+  /admin/users/{id}:
+    get:
+      description: Get detailed user information by ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get user by ID (Admin only)
+      tags:
+      - admin
+  /admin/users/{id}/revoke-api-key:
+    post:
+      description: Revoke a user's API key
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Revoke user API key (Admin only)
+      tags:
+      - admin
+  /admin/users/{id}/toggle-status:
+    put:
+      consumes:
+      - application/json
+      description: Activate or deactivate a user account
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Active status
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.ToggleUserStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Toggle user active status (Admin only)
+      tags:
+      - admin
+  /api/{collection}:
+    get:
+      description: Get all documents from the specified collection
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - ApiKeyAuth: []
+      summary: Get all documents from collection
+      tags:
+      - dynamic-api
+    post:
+      consumes:
+      - application/json
+      description: Create a new document in the specified collection
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Document data
+        in: body
+        name: data
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - ApiKeyAuth: []
+      summary: Create document in collection
+      tags:
+      - dynamic-api
+  /api/{collection}/{id}:
+    delete:
+      description: Delete a specific document by ID from the collection
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - ApiKeyAuth: []
+      summary: Delete document by ID
+      tags:
+      - dynamic-api
+    get:
+      description: Get a specific document by ID from the collection
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - ApiKeyAuth: []
+      summary: Get document by ID
+      tags:
+      - dynamic-api
+    put:
+      consumes:
+      - application/json
+      description: Update a specific document by ID in the collection
+      parameters:
+      - description: Collection name
+        in: path
+        name: collection
+        required: true
+        type: string
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update data
+        in: body
+        name: data
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - ApiKeyAuth: []
+      summary: Update document by ID
+      tags:
+      - dynamic-api
+  /auth/me:
+    get:
+      description: Get current authenticated user information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - auth
+  /auth/mongodb-uri:
+    put:
+      consumes:
+      - application/json
+      description: Update user's custom MongoDB connection URI
+      parameters:
+      - description: MongoDB URI data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateMongoURIRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Update MongoDB URI
+      tags:
+      - auth
+  /auth/signin:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user and return JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: User signin
+      tags:
+      - auth
+  /auth/signup:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account
+      parameters:
+      - description: Signup data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.SignupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Success
+        "400":
+          description: Bad Request
+        "409":
+          description: Conflict
+        "500":
+          description: Internal Server Error
+      summary: User signup
+      tags:
+      - auth
+  /schemas:
+    get:
+      description: Get all schemas for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get schemas
+      tags:
+      - schema
+    post:
+      consumes:
+      - application/json
+      description: Create a new schema/collection definition
+      parameters:
+      - description: Schema data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateSchemaRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "409":
+          description: Conflict
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Create schema
+      tags:
+      - schema
+  /schemas/{id}:
+    delete:
+      description: Delete a schema (soft delete)
+      parameters:
+      - description: Schema ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Delete schema
+      tags:
+      - schema
+    get:
+      description: Get a specific schema by ID
+      parameters:
+      - description: Schema ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get schema by ID
+      tags:
+      - schema
+  /user/api-usage:
+    get:
+      description: Get detailed API usage statistics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get API usage stats
+      tags:
+      - user
+  /user/dashboard:
+    get:
+      description: Get dashboard data for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get user dashboard data
+      tags:
+      - user
+  /user/regenerate-api-key:
+    post:
+      description: Generate a new API key for the user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Regenerate API key
+      tags:
+      - user
+securityDefinitions:
+  ApiKeyAuth:
+    description: API Key for dynamic API access
+    in: header
+    name: X-API-Key
+    type: apiKey
+  BearerAuth:
+    description: 'JWT Bearer token. Format: Bearer {token}'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

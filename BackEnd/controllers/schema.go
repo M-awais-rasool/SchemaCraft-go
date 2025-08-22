@@ -27,11 +27,11 @@ func NewSchemaController() *SchemaController {
 // @Produce json
 // @Security BearerAuth
 // @Param request body models.CreateSchemaRequest true "Schema data"
-// @Success 201 {object} models.Schema
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 409 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 201 "Created"
+// @Failure 400 "Bad Request"
+// @Failure 401 "Unauthorized"
+// @Failure 409 "Conflict"
+// @Failure 500 "Internal Server Error"
 // @Router /schemas [post]
 func (sc *SchemaController) CreateSchema(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -108,9 +108,9 @@ func (sc *SchemaController) CreateSchema(c *gin.Context) {
 // @Tags schema
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {array} models.Schema
-// @Failure 401 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 500 "Internal Server Error"
 // @Router /schemas [get]
 func (sc *SchemaController) GetSchemas(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -145,10 +145,10 @@ func (sc *SchemaController) GetSchemas(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Schema ID"
-// @Success 200 {object} models.Schema
-// @Failure 401 {object} gin.H
-// @Failure 404 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 404 "Not Found"
+// @Failure 500 "Internal Server Error"	
 // @Router /schemas/{id} [get]
 func (sc *SchemaController) GetSchemaByID(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -185,10 +185,10 @@ func (sc *SchemaController) GetSchemaByID(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Schema ID"
-// @Success 200 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 404 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 404 "Not Found"
+// @Failure 500 "Internal Server Error"
 // @Router /schemas/{id} [delete]
 func (sc *SchemaController) DeleteSchema(c *gin.Context) {
 	userID, exists := c.Get("user_id")

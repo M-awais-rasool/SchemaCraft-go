@@ -16,6 +16,10 @@ import (
 
 type AdminController struct{}
 
+type ToggleUserStatusRequest struct {
+    IsActive bool `json:"is_active"`
+}
+
 func NewAdminController() *AdminController {
 	return &AdminController{}
 }
@@ -27,10 +31,10 @@ func NewAdminController() *AdminController {
 // @Security BearerAuth
 // @Param page query int false "Page number (default: 1)"
 // @Param limit query int false "Items per page (default: 20, max: 100)"
-// @Success 200 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 403 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 403 "Forbidden"
+// @Failure 500 "Internal Server Error"
 // @Router /admin/users [get]
 func (ac *AdminController) GetAllUsers(c *gin.Context) {
 	page := 1
@@ -98,12 +102,12 @@ func (ac *AdminController) GetAllUsers(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID"
-// @Success 200 {object} models.User
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 403 {object} gin.H
-// @Failure 404 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 400 "Bad Request"
+// @Failure 401 "Unauthorized"
+// @Failure 403 "Forbidden"
+// @Failure 404 "Not Found"
+// @Failure 500 "Internal Server Error"
 // @Router /admin/users/{id} [get]
 func (ac *AdminController) GetUserByID(c *gin.Context) {
 	userIDStr := c.Param("id")
@@ -139,13 +143,13 @@ func (ac *AdminController) GetUserByID(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID"
-// @Param request body gin.H true "Active status"
-// @Success 200 {object} gin.H
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 403 {object} gin.H
-// @Failure 404 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Param request body ToggleUserStatusRequest true "Active status"
+// @Success 200 "Success"
+// @Failure 400 "Bad Request"
+// @Failure 401 "Unauthorized"
+// @Failure 403 "Forbidden"
+// @Failure 404 "Not Found"
+// @Failure 500 "Internal Server Error"
 // @Router /admin/users/{id}/toggle-status [put]
 func (ac *AdminController) ToggleUserStatus(c *gin.Context) {
 	userIDStr := c.Param("id")
@@ -193,10 +197,10 @@ func (ac *AdminController) ToggleUserStatus(c *gin.Context) {
 // @Tags admin
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 403 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 403 "Forbidden"
+// @Failure 500 "Internal Server Error"
 // @Router /admin/stats [get]
 func (ac *AdminController) GetPlatformStats(c *gin.Context) {
 	// Total users
@@ -247,12 +251,12 @@ func (ac *AdminController) GetPlatformStats(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID"
-// @Success 200 {object} gin.H
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 403 {object} gin.H
-// @Failure 404 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 400 "Bad Request"
+// @Failure 401 "Unauthorized"
+// @Failure 403 "Forbidden"
+// @Failure 404 "Not Found"
+// @Failure 500 "Internal Server Error"
 // @Router /admin/users/{id}/revoke-api-key [post]
 func (ac *AdminController) RevokeAPIKey(c *gin.Context) {
 	userIDStr := c.Param("id")

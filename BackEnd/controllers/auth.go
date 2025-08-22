@@ -27,10 +27,10 @@ func NewAuthController() *AuthController {
 // @Accept json
 // @Produce json
 // @Param request body models.SignupRequest true "Signup data"
-// @Success 201 {object} models.LoginResponse
-// @Failure 400 {object} gin.H
-// @Failure 409 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 201 "Success"
+// @Failure 400 "Bad Request"
+// @Failure 409 "Conflict"
+// @Failure 500 "Internal Server Error"
 // @Router /auth/signup [post]
 func (ac *AuthController) Signup(c *gin.Context) {
 	var req models.SignupRequest
@@ -109,10 +109,10 @@ func (ac *AuthController) Signup(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body models.LoginRequest true "Login credentials"
-// @Success 200 {object} models.LoginResponse
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 400 "Bad Request"
+// @Failure 401 "Unauthorized"
+// @Failure 500 "Internal Server Error"
 // @Router /auth/signin [post]
 func (ac *AuthController) Signin(c *gin.Context) {
 	var req models.LoginRequest
@@ -163,9 +163,9 @@ func (ac *AuthController) Signin(c *gin.Context) {
 // @Tags auth
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} models.User
-// @Failure 401 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 500 "Internal Server Error"
 // @Router /auth/me [get]
 func (ac *AuthController) GetCurrentUser(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -192,10 +192,10 @@ func (ac *AuthController) GetCurrentUser(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body models.UpdateMongoURIRequest true "MongoDB URI data"
-// @Success 200 {object} gin.H
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 400 "Bad Request"
+// @Failure 401 "Unauthorized"
+// @Failure 500 "Internal Server Error"
 // @Router /auth/mongodb-uri [put]
 func (ac *AuthController) UpdateMongoURI(c *gin.Context) {
 	userID, exists := c.Get("user_id")

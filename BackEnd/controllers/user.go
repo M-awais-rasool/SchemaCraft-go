@@ -23,9 +23,9 @@ func NewUserController() *UserController {
 // @Tags user
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 500 "Internal Server Error"
 // @Router /user/dashboard [get]
 func (uc *UserController) GetDashboard(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -94,9 +94,9 @@ func (uc *UserController) GetDashboard(c *gin.Context) {
 // @Tags user
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 500 "Internal Server Error"
 // @Router /user/regenerate-api-key [post]
 func (uc *UserController) RegenerateAPIKey(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -133,9 +133,9 @@ func (uc *UserController) RegenerateAPIKey(c *gin.Context) {
 // @Tags user
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 500 "Internal Server Error"
 // @Router /user/api-usage [get]
 func (uc *UserController) GetAPIUsage(c *gin.Context) {
 	userID, exists := c.Get("user_id")

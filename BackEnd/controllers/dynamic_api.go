@@ -80,11 +80,11 @@ func (dc *DynamicAPIController) filterPublicFields(data map[string]interface{}, 
 // @Security ApiKeyAuth
 // @Param collection path string true "Collection name"
 // @Param data body object true "Document data"
-// @Success 201 {object} gin.H
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 404 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 201 "Created"
+// @Failure 400 "Bad Request"
+// @Failure 401 "Unauthorized"
+// @Failure 404 "Not Found"
+// @Failure 500 "Internal Server Error"
 // @Router /api/{collection} [post]
 func (dc *DynamicAPIController) CreateDocument(c *gin.Context) {
 	collectionName := c.Param("collection")
@@ -162,10 +162,10 @@ func (dc *DynamicAPIController) CreateDocument(c *gin.Context) {
 // @Param collection path string true "Collection name"
 // @Param page query int false "Page number (default: 1)"
 // @Param limit query int false "Items per page (default: 10, max: 100)"
-// @Success 200 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 404 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 404 "Not Found"
+// @Failure 500 "Internal Server Error"
 // @Router /api/{collection} [get]
 func (dc *DynamicAPIController) GetDocuments(c *gin.Context) {
 	collectionName := c.Param("collection")
@@ -254,10 +254,10 @@ func (dc *DynamicAPIController) GetDocuments(c *gin.Context) {
 // @Security ApiKeyAuth
 // @Param collection path string true "Collection name"
 // @Param id path string true "Document ID"
-// @Success 200 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 404 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 404 "Not Found"
+// @Failure 500 "Internal Server Error"
 // @Router /api/{collection}/{id} [get]
 func (dc *DynamicAPIController) GetDocumentByID(c *gin.Context) {
 	collectionName := c.Param("collection")
@@ -321,11 +321,11 @@ func (dc *DynamicAPIController) GetDocumentByID(c *gin.Context) {
 // @Param collection path string true "Collection name"
 // @Param id path string true "Document ID"
 // @Param data body object true "Update data"
-// @Success 200 {object} gin.H
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 404 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 400 "Bad Request"
+// @Failure 401 "Unauthorized"
+// @Failure 404 "Not Found"
+// @Failure 500 "Internal Server Error"
 // @Router /api/{collection}/{id} [put]
 func (dc *DynamicAPIController) UpdateDocument(c *gin.Context) {
 	collectionName := c.Param("collection")
@@ -402,10 +402,10 @@ func (dc *DynamicAPIController) UpdateDocument(c *gin.Context) {
 // @Security ApiKeyAuth
 // @Param collection path string true "Collection name"
 // @Param id path string true "Document ID"
-// @Success 200 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 404 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 404 "Not Found"
+// @Failure 500 "Internal Server Error"
 // @Router /api/{collection}/{id} [delete]
 func (dc *DynamicAPIController) DeleteDocument(c *gin.Context) {
 	collectionName := c.Param("collection")
