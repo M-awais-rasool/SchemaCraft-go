@@ -2,9 +2,12 @@ package routes
 
 import (
 	"schemacraft-backend/controllers"
+	_ "schemacraft-backend/docs" // This is required for go-swagger
 	"schemacraft-backend/middleware"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func SetupRoutes() *gin.Engine {
@@ -34,11 +37,19 @@ func SetupRoutes() *gin.Engine {
 		c.JSON(200, gin.H{"status": "healthy"})
 	})
 
+	// Swagger documentation
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	// User-specific Swagger UI and API docs (allows token-based access for direct browser viewing)
+	r.GET("/user/swagger-ui", userController.GetSwaggerUI)
+	r.GET("/user/api-docs", userController.GetAPIDocumentation)
+
 	// Auth routes (public)
 	authGroup := r.Group("/auth")
 	{
 		authGroup.POST("/signup", authController.Signup)
 		authGroup.POST("/signin", authController.Signin)
+		authGroup.POST("/google", authController.GoogleAuth)
 	}
 
 	// Protected routes (require JWT)
@@ -53,6 +64,9 @@ func SetupRoutes() *gin.Engine {
 		protectedGroup.GET("/user/dashboard", userController.GetDashboard)
 		protectedGroup.POST("/user/regenerate-api-key", userController.RegenerateAPIKey)
 		protectedGroup.GET("/user/api-usage", userController.GetAPIUsage)
+
+		// API documentation for frontend (protected route)
+		protectedGroup.GET("/user/api-documentation", userController.GetAPIDocumentation)
 
 		// Schema management routes
 		protectedGroup.POST("/schemas", schemaController.CreateSchema)

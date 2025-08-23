@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   Api,
@@ -9,32 +10,91 @@ import {
   CheckCircle,
   Timeline
 } from '@mui/icons-material'
+import { UserService, type DashboardData } from '../../../services/userService'
+import { useAuth } from '../../../contexts/AuthContext'
 
 const UserOverview = () => {
+  const { user } = useAuth()
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      const data = await UserService.getDashboard()
+      setDashboardData(data)
+    } catch (err: any) {
+      console.error('Failed to fetch dashboard data:', err)
+      setError(err.response?.data?.error || 'Failed to load dashboard data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {/* Loading skeleton */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+              <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+        <h3 className="text-red-800 font-semibold">Error Loading Dashboard</h3>
+        <p className="text-red-600 mt-2">{error}</p>
+        <button 
+          onClick={fetchDashboardData}
+          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+
   const stats = [
     {
       title: 'Tables Created',
-      value: '12',
+      value: dashboardData?.stats.total_schemas.toString() || '0',
       icon: TableChart,
       description: 'Active database tables'
     },
     {
       title: 'API Calls',
-      value: '2,847',
+      value: dashboardData?.stats.api_usage.used_this_month.toLocaleString() || '0',
       icon: Api,
       description: 'This month'
     },
     {
       title: 'Database Status',
-      value: 'Connected',
+      value: dashboardData?.stats.has_custom_db ? 'Connected' : 'Not Connected',
       icon: Storage,
-      description: 'MongoDB Atlas'
+      description: dashboardData?.stats.has_custom_db ? 'Custom MongoDB' : 'Setup required'
     },
     {
-      title: 'Uptime',
-      value: '99.9%',
+      title: 'Quota Usage',
+      value: `${Math.round(((dashboardData?.stats.api_usage.used_this_month || 0) / (dashboardData?.stats.api_usage.monthly_quota || 1)) * 100)}%`,
       icon: TrendingUp,
-      description: 'Last 30 days'
+      description: `${dashboardData?.stats.api_usage.used_this_month || 0} / ${dashboardData?.stats.api_usage.monthly_quota || 0} calls`
     }
   ]
 
@@ -77,9 +137,12 @@ const UserOverview = () => {
       >
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Welcome back, John!</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Welcome back, {dashboardData?.user.name || 'User'}!
+            </h1>
             <p className="text-gray-600 mt-2">
-              Your API builder is ready. You have 12 active tables and your database is connected.
+              Your API builder is ready. You have {dashboardData?.stats.total_schemas || 0} active tables
+              {dashboardData?.stats.has_custom_db ? ' and your database is connected.' : ' and database setup is pending.'}
             </p>
           </div>
           <div className="hidden md:block">
@@ -191,33 +254,25 @@ const UserOverview = () => {
             <Api className="w-5 h-5 text-gray-400" />
           </div>
           <div className="space-y-3">
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-mono text-gray-900">GET /api/users</span>
-                <div className="flex items-center space-x-1">
-                  <div className="w-2 h-2 rounded-full bg-black" />
-                  <span className="text-xs text-gray-600">Active</span>
+            {dashboardData?.schemas && dashboardData.schemas.length > 0 ? (
+              dashboardData.schemas.slice(0, 3).map((schema: any) => (
+                <div key={schema.id} className="p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-mono text-gray-900">
+                      GET /api/{schema.collection_name}
+                    </span>
+                    <div className="flex items-center space-x-1">
+                      <div className="w-2 h-2 rounded-full bg-black" />
+                      <span className="text-xs text-gray-600">Active</span>
+                    </div>
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="p-3 bg-gray-50 rounded-lg text-center">
+                <span className="text-sm text-gray-500">No schemas created yet</span>
               </div>
-            </div>
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-mono text-gray-900">POST /api/users</span>
-                <div className="flex items-center space-x-1">
-                  <div className="w-2 h-2 rounded-full bg-black" />
-                  <span className="text-xs text-gray-600">Active</span>
-                </div>
-              </div>
-            </div>
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-mono text-gray-900">GET /api/products</span>
-                <div className="flex items-center space-x-1">
-                  <div className="w-2 h-2 rounded-full bg-black" />
-                  <span className="text-xs text-gray-600">Active</span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
           <button className="w-full mt-4 p-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
             View All Endpoints

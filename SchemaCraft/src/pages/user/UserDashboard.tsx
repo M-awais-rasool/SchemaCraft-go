@@ -11,8 +11,10 @@ import {
   Close,
   Notifications,
   Search,
-  Person
+  Person,
+  Description
 } from '@mui/icons-material'
+import { useAuth } from '../../contexts/AuthContext'
 
 // Import user dashboard components
 import UserOverview from './components/UserOverview'
@@ -21,8 +23,10 @@ import MongoConnection from './components/MongoConnection'
 import TablesManager from './components/TablesManager'
 import DataViewer from './components/DataViewer'
 import AccountSettings from './components/AccountSettings'
+import APIDocumentation from './components/APIDocumentation'
 
 const UserDashboard = () => {
+  const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -34,6 +38,7 @@ const UserDashboard = () => {
     { id: 'mongodb', label: 'MongoDB Connection', icon: Storage },
     { id: 'tables', label: 'Tables', icon: TableChart },
     { id: 'data', label: 'Data Viewer', icon: Visibility },
+    { id: 'api-docs', label: 'API Documentation', icon: Description },
     { id: 'settings', label: 'Account Settings', icon: Settings },
   ]
 
@@ -49,6 +54,8 @@ const UserDashboard = () => {
         return <TablesManager />
       case 'data':
         return <DataViewer />
+      case 'api-docs':
+        return <APIDocumentation />
       case 'settings':
         return <AccountSettings />
       default:
@@ -203,8 +210,8 @@ const UserDashboard = () => {
                   <Person className="w-5 h-5 text-white" />
                 </div>
                 <div className="hidden md:block text-left">
-                  <p className="text-sm font-medium text-gray-900">John Doe</p>
-                  <p className="text-xs text-gray-500">john@example.com</p>
+                  <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
+                  <p className="text-xs text-gray-500">{user?.email || 'user@example.com'}</p>
                 </div>
               </button>
 
@@ -220,7 +227,12 @@ const UserDashboard = () => {
                       <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
                       <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
                       <hr className="my-2" />
-                      <a href="#" className="block px-4 py-2 text-sm text-black hover:bg-gray-100">Sign Out</a>
+                      <button 
+                        onClick={logout}
+                        className="block w-full text-left px-4 py-2 text-sm text-black hover:bg-gray-100"
+                      >
+                        Sign Out
+                      </button>
                     </div>
                   </motion.div>
                 )}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   TableChart,
@@ -11,56 +11,149 @@ import {
   NavigateBefore,
   NavigateNext
 } from '@mui/icons-material'
-
-interface DataRecord {
-  id: string
-  [key: string]: any
-}
+import { SchemaService, type Schema } from '../../../services/schemaService'
+import { DataService, type DataRecord, type PaginatedResponse } from '../../../services/dataService'
 
 const DataViewer = () => {
-  const [selectedTable, setSelectedTable] = useState('users')
+  const [schemas, setSchemas] = useState<Schema[]>([])
+  const [selectedTable, setSelectedTable] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [data, setData] = useState<PaginatedResponse<DataRecord> | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [loadingData, setLoadingData] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [newRecord, setNewRecord] = useState<Record<string, any>>({})
 
-  const tables = ['users', 'products', 'orders']
   const recordsPerPage = 10
 
-  const sampleData: Record<string, DataRecord[]> = {
-    users: [
-      { id: '1', name: 'John Doe', email: 'john@example.com', age: 28, active: true },
-      { id: '2', name: 'Jane Smith', email: 'jane@example.com', age: 32, active: true },
-      { id: '3', name: 'Bob Johnson', email: 'bob@example.com', age: 45, active: false },
-      { id: '4', name: 'Alice Brown', email: 'alice@example.com', age: 29, active: true },
-      { id: '5', name: 'Charlie Wilson', email: 'charlie@example.com', age: 35, active: true }
-    ],
-    products: [
-      { id: '1', title: 'Laptop', price: 999, inStock: true, category: 'Electronics' },
-      { id: '2', title: 'Mouse', price: 25, inStock: false, category: 'Electronics' },
-      { id: '3', title: 'Keyboard', price: 75, inStock: true, category: 'Electronics' }
-    ],
-    orders: [
-      { id: '1', userId: '1', total: 1024, status: 'completed', date: '2024-08-20' },
-      { id: '2', userId: '2', total: 25, status: 'pending', date: '2024-08-21' }
-    ]
+  useEffect(() => {
+    fetchSchemas()
+  }, [])
+
+  useEffect(() => {
+    if (selectedTable) {
+      fetchData()
+    }
+  }, [selectedTable, currentPage, searchTerm])
+
+  const fetchSchemas = async () => {
+    try {
+      setLoading(true)
+      const data = await SchemaService.getSchemas()
+      setSchemas(data)
+      if (data.length > 0 && !selectedTable) {
+        setSelectedTable(data[0].collection_name)
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch schemas:', err)
+      setError(err.response?.data?.error || 'Failed to load schemas')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const currentData = sampleData[selectedTable] || []
-  const filteredData = currentData.filter(record =>
-    Object.values(record).some(value =>
-      value.toString().toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  )
+  const fetchData = async () => {
+    if (!selectedTable) return
 
-  const totalPages = Math.ceil(filteredData.length / recordsPerPage)
-  const paginatedData = filteredData.slice(
-    (currentPage - 1) * recordsPerPage,
-    currentPage * recordsPerPage
-  )
+    try {
+      setLoadingData(true)
+      setError(null)
+      
+      const response = await DataService.getDocuments(selectedTable, currentPage, recordsPerPage)
+      setData(response)
+    } catch (err: any) {
+      console.error('Failed to fetch data:', err)
+      setError(err.response?.data?.error || 'Failed to load data')
+      setData(null)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const getSelectedSchema = () => {
+    return schemas.find(schema => schema.collection_name === selectedTable)
+  }
+
+  const initializeNewRecord = () => {
+    const schema = getSelectedSchema()
+    if (!schema) return {}
+
+    const record: Record<string, any> = {}
+    schema.fields.forEach(field => {
+      if (field.name !== 'id') { // Skip ID field as it's auto-generated
+        record[field.name] = field.default || ''
+      }
+    })
+    return record
+  }
+
+  const handleAddRecord = async () => {
+    if (!selectedTable) return
+
+    try {
+      const recordData = { ...newRecord }
+      await DataService.createDocument(selectedTable, recordData)
+      
+      setShowAddModal(false)
+      setNewRecord({})
+      fetchData() // Refresh data
+      alert('Record added successfully!')
+    } catch (err: any) {
+      console.error('Failed to add record:', err)
+      alert(err.response?.data?.error || 'Failed to add record')
+    }
+  }
+
+  const handleDeleteRecord = async (recordId: string) => {
+    if (!selectedTable || !confirm('Are you sure you want to delete this record?')) return
+
+    try {
+      await DataService.deleteDocument(selectedTable, recordId)
+      fetchData() // Refresh data
+      alert('Record deleted successfully!')
+    } catch (err: any) {
+      console.error('Failed to delete record:', err)
+      alert(err.response?.data?.error || 'Failed to delete record')
+    }
+  }
 
   const getTableColumns = () => {
-    if (currentData.length === 0) return []
-    return Object.keys(currentData[0])
+    const schema = getSelectedSchema()
+    if (!schema) return []
+    
+    // Include ID and all schema fields that are public
+    const columns = ['id']
+    schema.fields.forEach(field => {
+      if (field.visibility === 'public' && field.name !== 'id') {
+        columns.push(field.name)
+      }
+    })
+    return columns
+  }
+
+  const getCurrentData = () => {
+    return data?.data || []
+  }
+
+  const getTotalRecords = () => {
+    return data?.total || 0
+  }
+
+  const getTotalPages = () => {
+    return data?.total_pages || 0
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+        </div>
+      </div>
+    )
   }
 
   const renderCellValue = (value: any) => {
@@ -117,8 +210,11 @@ const DataViewer = () => {
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
             >
-              {tables.map(table => (
-                <option key={table} value={table}>{table}</option>
+              <option value="">Select a table...</option>
+              {schemas.map(schema => (
+                <option key={schema.id} value={schema.collection_name}>
+                  {schema.collection_name}
+                </option>
               ))}
             </select>
           </div>
@@ -163,13 +259,30 @@ const DataViewer = () => {
             <div className="flex items-center space-x-3">
               <TableChart className="w-5 h-5 text-black" />
               <h2 className="text-lg font-semibold text-gray-900">
-                {selectedTable} ({filteredData.length} records)
+                {selectedTable} ({getTotalRecords()} records)
               </h2>
             </div>
           </div>
         </div>
 
-        {paginatedData.length > 0 ? (
+        {/* Error Message */}
+        {error && (
+          <div className="p-6 bg-red-50 border-l-4 border-red-400">
+            <div className="flex">
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loadingData ? (
+          <div className="p-12 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading data...</p>
+          </div>
+        ) : getCurrentData().length > 0 ? (
           <>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -184,7 +297,7 @@ const DataViewer = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedData.map((record, index) => (
+                  {getCurrentData().map((record, index) => (
                     <motion.tr
                       key={record.id}
                       initial={{ opacity: 0, x: -20 }}
@@ -194,7 +307,7 @@ const DataViewer = () => {
                     >
                       {getTableColumns().map(column => (
                         <td key={column} className="py-3 px-6">
-                          {renderCellValue(record[column])}
+                          {column === 'id' ? record.id : renderCellValue(record.data?.[column])}
                         </td>
                       ))}
                       <td className="py-3 px-6">
@@ -205,7 +318,10 @@ const DataViewer = () => {
                           <button className="p-1 text-gray-400 hover:text-black transition-colors">
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button className="p-1 text-gray-400 hover:text-black transition-colors">
+                          <button 
+                            onClick={() => handleDeleteRecord(record.id)}
+                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                          >
                             <Delete className="w-4 h-4" />
                           </button>
                         </div>
@@ -217,12 +333,12 @@ const DataViewer = () => {
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
+            {getTotalPages() > 1 && (
               <div className="flex items-center justify-between p-6 border-t border-gray-200">
                 <div className="text-sm text-gray-600">
                   Showing {(currentPage - 1) * recordsPerPage + 1} to{' '}
-                  {Math.min(currentPage * recordsPerPage, filteredData.length)} of{' '}
-                  {filteredData.length} results
+                  {Math.min(currentPage * recordsPerPage, getTotalRecords())} of{' '}
+                  {getTotalRecords()} results
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
@@ -235,7 +351,7 @@ const DataViewer = () => {
                   </button>
                   
                   <div className="flex items-center space-x-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    {Array.from({ length: getTotalPages() }, (_, i) => i + 1).map(page => (
                       <button
                         key={page}
                         onClick={() => setCurrentPage(page)}
@@ -251,8 +367,8 @@ const DataViewer = () => {
                   </div>
                   
                   <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(Math.min(getTotalPages(), currentPage + 1))}
+                    disabled={currentPage === getTotalPages()}
                     className="flex items-center space-x-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <span>Next</span>
@@ -285,32 +401,82 @@ const DataViewer = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl shadow-xl max-w-md w-full"
+            className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[80vh] overflow-hidden"
           >
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
                 Add New {selectedTable.slice(0, -1)}
               </h3>
-              <p className="text-gray-600 mb-4">
-                This is a demo. In a real application, you would have a form here to add new records to your {selectedTable} table.
-              </p>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAddModal(false)
-                    alert('Record added successfully!')
-                  }}
-                  className="flex-1 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
-                >
-                  Add Record
-                </button>
-              </div>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {getSelectedSchema() ? (
+                <div className="space-y-4">
+                  {getSelectedSchema()!.fields
+                    .filter(field => field.name !== 'id') // Skip ID field
+                    .map(field => (
+                    <div key={field.name}>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {field.name}
+                        {field.required && <span className="text-red-500 ml-1">*</span>}
+                      </label>
+                      {field.type === 'boolean' ? (
+                        <select
+                          value={newRecord[field.name] || 'false'}
+                          onChange={(e) => setNewRecord(prev => ({
+                            ...prev,
+                            [field.name]: e.target.value === 'true'
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+                        >
+                          <option value="false">False</option>
+                          <option value="true">True</option>
+                        </select>
+                      ) : field.type === 'number' ? (
+                        <input
+                          type="number"
+                          value={newRecord[field.name] || ''}
+                          onChange={(e) => setNewRecord(prev => ({
+                            ...prev,
+                            [field.name]: parseFloat(e.target.value) || 0
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={newRecord[field.name] || ''}
+                          onChange={(e) => setNewRecord(prev => ({
+                            ...prev,
+                            [field.name]: e.target.value
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-600">Schema not found for this table.</p>
+              )}
+            </div>
+            
+            <div className="flex space-x-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setShowAddModal(false)
+                  setNewRecord({})
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddRecord}
+                className="flex-1 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                Add Record
+              </button>
             </div>
           </motion.div>
         </div>

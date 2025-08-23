@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   Storage,
@@ -10,36 +10,72 @@ import {
   Refresh,
   Info
 } from '@mui/icons-material'
+import { AuthService } from '../../../services/authService'
+import { useAuth } from '../../../contexts/AuthContext'
 
 const MongoConnection = () => {
+  const { user, updateUser } = useAuth()
   const [mongoUri, setMongoUri] = useState('')
+  const [databaseName, setDatabaseName] = useState('')
   const [showUri, setShowUri] = useState(false)
-  const [isConnected, setIsConnected] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle')
+  const [error, setError] = useState<string | null>(null)
+
+  // Initialize form with existing user data
+  useEffect(() => {
+    if (user?.mongodb_uri) {
+      setMongoUri(user.mongodb_uri)
+      setConnectionStatus('connected')
+    }
+    if (user?.database_name) {
+      setDatabaseName(user.database_name)
+    }
+  }, [user])
 
   const handleTestConnection = async () => {
-    if (!mongoUri.trim()) return
+    if (!mongoUri.trim() || !databaseName.trim()) {
+      setError('Please enter both MongoDB URI and database name')
+      return
+    }
     
     setIsLoading(true)
     setConnectionStatus('connecting')
+    setError(null)
     
-    // Simulate connection test
+    // Simple validation - in real app, this would test actual connection
     setTimeout(() => {
       if (mongoUri.includes('mongodb://') || mongoUri.includes('mongodb+srv://')) {
         setConnectionStatus('connected')
-        setIsConnected(true)
+        setError(null)
       } else {
         setConnectionStatus('error')
-        setIsConnected(false)
+        setError('Invalid MongoDB connection string format')
       }
       setIsLoading(false)
     }, 2000)
   }
 
-  const handleSave = () => {
-    if (connectionStatus === 'connected') {
+  const handleSave = async () => {
+    if (connectionStatus !== 'connected') {
+      setError('Please test the connection first')
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      setError(null)
+      
+      await AuthService.updateMongoURI(mongoUri, databaseName)
+      await updateUser()
+      
       alert('MongoDB connection saved successfully!')
+    } catch (err: any) {
+      console.error('Failed to save MongoDB connection:', err)
+      setError(err.response?.data?.error || 'Failed to save MongoDB connection')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -118,7 +154,7 @@ const MongoConnection = () => {
               </div>
             </div>
           </div>
-          {isConnected && (
+          {connectionStatus === 'connected' && (
             <div className="flex items-center space-x-2 px-3 py-1 bg-gray-100 rounded-full">
               <CheckCircle className="w-4 h-4 text-black" />
               <span className="text-sm font-medium text-black">Active</span>
@@ -126,24 +162,38 @@ const MongoConnection = () => {
           )}
         </div>
 
-        {isConnected && (
+        {connectionStatus === 'connected' && (
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <h3 className="font-medium text-gray-900 mb-2">Connection Details</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Database:</span>
-                <span className="font-mono text-gray-900">production_db</span>
+                <span className="font-mono text-gray-900">{databaseName || 'Not specified'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Host:</span>
-                <span className="font-mono text-gray-900">cluster0.mongodb.net</span>
+                <span className="text-gray-600">Status:</span>
+                <span className="text-gray-900">Connected</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Connected:</span>
-                <span className="text-gray-900">2 hours ago</span>
+                <span className="text-gray-600">Last Updated:</span>
+                <span className="text-gray-900">{user?.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'Never'}</span>
               </div>
             </div>
           </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg"
+          >
+            <div className="flex items-center space-x-2">
+              <ErrorIcon className="w-4 h-4 text-red-600" />
+              <span className="text-sm text-red-600">{error}</span>
+            </div>
+          </motion.div>
         )}
       </motion.div>
 
@@ -166,7 +216,7 @@ const MongoConnection = () => {
                 type={showUri ? "text" : "password"}
                 value={mongoUri}
                 onChange={(e) => setMongoUri(e.target.value)}
-                placeholder="mongodb+srv://username:password@cluster.mongodb.net/database"
+                placeholder="mongodb+srv://username:password@cluster.mongodb.net/"
                 className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
               />
               <button
@@ -178,23 +228,36 @@ const MongoConnection = () => {
             </div>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Database Name
+            </label>
+            <input
+              type="text"
+              value={databaseName}
+              onChange={(e) => setDatabaseName(e.target.value)}
+              placeholder="mydatabase"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+            />
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={handleTestConnection}
-              disabled={!mongoUri.trim() || isLoading}
+              disabled={!mongoUri.trim() || !databaseName.trim() || isLoading}
               className="flex items-center justify-center space-x-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Refresh className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>Test Connection</span>
+              <span>{isLoading ? 'Testing...' : 'Test Connection'}</span>
             </button>
             
             <button
               onClick={handleSave}
-              disabled={connectionStatus !== 'connected'}
+              disabled={connectionStatus !== 'connected' || isSaving}
               className="flex items-center justify-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="w-4 h-4" />
-              <span>Save Connection</span>
+              <span>{isSaving ? 'Saving...' : 'Save Connection'}</span>
             </button>
           </div>
         </div>

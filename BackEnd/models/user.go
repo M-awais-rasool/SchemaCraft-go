@@ -11,6 +11,7 @@ type User struct {
 	Name         string             `json:"name" bson:"name" binding:"required"`
 	Email        string             `json:"email" bson:"email" binding:"required,email"`
 	Password     string             `json:"-" bson:"password"`
+	GoogleID     string             `json:"google_id,omitempty" bson:"google_id,omitempty"`
 	APIKey       string             `json:"api_key" bson:"api_key"`
 	MongoDBURI   string             `json:"mongodb_uri,omitempty" bson:"mongodb_uri,omitempty"`
 	DatabaseName string             `json:"database_name,omitempty" bson:"database_name,omitempty"`
@@ -48,4 +49,8 @@ type LoginResponse struct {
 type UpdateMongoURIRequest struct {
 	MongoDBURI   string `json:"mongodb_uri" binding:"required"`
 	DatabaseName string `json:"database_name" binding:"required"`
+}
+
+type GoogleAuthRequest struct {
+	IDToken string `json:"id_token" binding:"required"`
 }

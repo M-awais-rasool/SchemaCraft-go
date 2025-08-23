@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   Person,
@@ -11,29 +11,67 @@ import {
   VisibilityOff,
   Warning
 } from '@mui/icons-material'
+import { useAuth } from '../../../contexts/AuthContext'
+import { UserService } from '../../../services/userService'
+import { AuthService } from '../../../services/authService'
 
 const AccountSettings = () => {
+  const { user, updateUser } = useAuth()
   const [activeTab, setActiveTab] = useState('profile')
   const [showPassword, setShowPassword] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+  
   const [profileData, setProfileData] = useState({
-    name: 'John Doe',
-    email: 'john@example.com',
-    company: 'TechCorp',
+    name: '',
+    email: '',
+    company: '',
     timezone: 'UTC-5',
     language: 'English'
   })
+  
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   })
+  
   const [notifications, setNotifications] = useState({
     emailUpdates: true,
     apiAlerts: true,
     securityNotifications: true,
     marketing: false
   })
+
+  // Load user data on component mount
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        name: user.name || '',
+        email: user.email || '',
+        company: '', // Backend doesn't store this yet
+        timezone: 'UTC-5', // Backend doesn't store this yet
+        language: 'English' // Backend doesn't store this yet
+      })
+    }
+  }, [user])
+
+  const clearMessages = () => {
+    setError('')
+    setSuccessMessage('')
+  }
+
+  const showError = (message: string) => {
+    setError(message)
+    setTimeout(clearMessages, 5000)
+  }
+
+  const showSuccess = (message: string) => {
+    setSuccessMessage(message)
+    setTimeout(clearMessages, 3000)
+  }
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: Person },
@@ -42,21 +80,90 @@ const AccountSettings = () => {
     { id: 'preferences', label: 'Preferences', icon: Language }
   ]
 
-  const handleProfileSave = () => {
-    alert('Profile updated successfully!')
+  const handleProfileSave = async () => {
+    clearMessages()
+    setLoading(true)
+    
+    try {
+      // Note: Backend endpoints don't exist yet, so we'll show a message
+      // await UserService.updateProfile(profileData)
+      
+      // For now, just show success message since backend endpoint doesn't exist
+      showSuccess('Profile updated successfully! (Note: Backend endpoint not implemented yet)')
+      
+      // Update user in context if needed
+      if (updateUser) {
+        await updateUser()
+      }
+    } catch (error: any) {
+      showError(error.response?.data?.error || 'Failed to update profile')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
+    clearMessages()
+    
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert('New passwords do not match!')
+      showError('New passwords do not match!')
       return
     }
-    alert('Password updated successfully!')
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    
+    if (passwordData.newPassword.length < 6) {
+      showError('New password must be at least 6 characters long')
+      return
+    }
+    
+    setLoading(true)
+    
+    try {
+      // Note: Backend endpoint doesn't exist yet
+      // await UserService.changePassword({
+      //   currentPassword: passwordData.currentPassword,
+      //   newPassword: passwordData.newPassword
+      // })
+      
+      showSuccess('Password updated successfully! (Note: Backend endpoint not implemented yet)')
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    } catch (error: any) {
+      showError(error.response?.data?.error || 'Failed to update password')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleNotificationsSave = () => {
-    alert('Notification preferences updated!')
+  const handleNotificationsSave = async () => {
+    clearMessages()
+    setLoading(true)
+    
+    try {
+      // Note: Backend endpoint doesn't exist yet
+      // await UserService.updateNotificationPreferences(notifications)
+      
+      showSuccess('Notification preferences updated! (Note: Backend endpoint not implemented yet)')
+    } catch (error: any) {
+      showError(error.response?.data?.error || 'Failed to update notification preferences')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    clearMessages()
+    setLoading(true)
+    
+    try {
+      // Note: Backend endpoint doesn't exist yet
+      // await UserService.deleteAccount()
+      
+      showError('Account deletion is not implemented yet in the backend')
+      setShowDeleteModal(false)
+    } catch (error: any) {
+      showError(error.response?.data?.error || 'Failed to delete account')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const renderProfileTab = () => (
@@ -124,10 +231,11 @@ const AccountSettings = () => {
         <div className="mt-6 flex justify-end">
           <button
             onClick={handleProfileSave}
-            className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
-            <span>Save Changes</span>
+            <span>{loading ? 'Saving...' : 'Save Changes'}</span>
           </button>
         </div>
       </div>
@@ -191,10 +299,11 @@ const AccountSettings = () => {
           <div className="flex justify-end">
             <button
               onClick={handlePasswordChange}
-              className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+              disabled={loading}
+              className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="w-4 h-4" />
-              <span>Update Password</span>
+              <span>{loading ? 'Updating...' : 'Update Password'}</span>
             </button>
           </div>
         </div>
@@ -255,10 +364,11 @@ const AccountSettings = () => {
         <div className="flex justify-end">
           <button
             onClick={handleNotificationsSave}
-            className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
-            <span>Save Preferences</span>
+            <span>{loading ? 'Saving...' : 'Save Preferences'}</span>
           </button>
         </div>
       </div>
@@ -336,6 +446,27 @@ const AccountSettings = () => {
         <p className="text-gray-600 mt-1">Manage your account preferences and settings</p>
       </motion.div>
 
+      {/* Error/Success Messages */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"
+        >
+          {error}
+        </motion.div>
+      )}
+      
+      {successMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg"
+        >
+          {successMessage}
+        </motion.div>
+      )}
+
       {/* Tabs */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -399,13 +530,11 @@ const AccountSettings = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    setShowDeleteModal(false)
-                    alert('Account deletion is not implemented in this demo.')
-                  }}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  onClick={handleDeleteAccount}
+                  disabled={loading}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Delete Account
+                  {loading ? 'Deleting...' : 'Delete Account'}
                 </button>
               </div>
             </div>

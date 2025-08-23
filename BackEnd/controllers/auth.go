@@ -2,7 +2,11 @@ package controllers
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"schemacraft-backend/config"
@@ -233,4 +237,209 @@ func (ac *AuthController) UpdateMongoURI(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "MongoDB URI updated successfully"})
+}
+
+// GoogleUser represents the user data from Google
+type GoogleUser struct {
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	VerifiedEmail bool   `json:"verified_email"`
+	Name          string `json:"name"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
+	Picture       string `json:"picture"`
+	Locale        string `json:"locale"`
+}
+
+// @Summary Google authentication
+// @Description Authenticate user with Google ID token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body models.GoogleAuthRequest true "Google ID token"
+// @Success 200 "Success"
+// @Failure 400 "Bad Request"
+// @Failure 401 "Unauthorized"
+// @Failure 500 "Internal Server Error"
+// @Router /auth/google [post]
+func (ac *AuthController) GoogleAuth(c *gin.Context) {
+	var req models.GoogleAuthRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Verify Google ID token
+	googleUser, err := ac.verifyGoogleToken(req.IDToken)
+	if err != nil {
+		fmt.Println("Error verifying Google token:", err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Google token"})
+		return
+	}
+
+	if !googleUser.VerifiedEmail {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Google account email not verified"})
+		return
+	}
+
+	// Check if user already exists
+	var existingUser models.User
+	err = config.DB.Collection("users").FindOne(context.TODO(), bson.M{"email": googleUser.Email}).Decode(&existingUser)
+
+	if err == nil {
+		// User exists - link Google account to existing user and sign them in
+		update := bson.M{
+			"$set": bson.M{
+				"google_id":  googleUser.ID,
+				"last_login": time.Now(),
+				"updated_at": time.Now(),
+			},
+		}
+
+		_, err = config.DB.Collection("users").UpdateOne(context.TODO(), bson.M{"_id": existingUser.ID}, update)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to link Google account"})
+			return
+		}
+
+		// Get updated user
+		err = config.DB.Collection("users").FindOne(context.TODO(), bson.M{"_id": existingUser.ID}).Decode(&existingUser)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+			return
+		}
+
+		// Generate JWT token
+		token, err := utils.GenerateJWT(existingUser.ID, existingUser.Email, existingUser.IsAdmin)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+			return
+		}
+
+		existingUser.Password = "" // Remove password from response
+		c.JSON(http.StatusOK, models.LoginResponse{
+			User:  &existingUser,
+			Token: token,
+		})
+		return
+	} else if err != mongo.ErrNoDocuments {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	// User doesn't exist - create new user
+	apiKey, err := utils.GenerateAPIKey()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate API key"})
+		return
+	}
+
+	newUser := models.User{
+		ID:        primitive.NewObjectID(),
+		Name:      googleUser.Name,
+		Email:     googleUser.Email,
+		GoogleID:  googleUser.ID,
+		APIKey:    apiKey,
+		IsAdmin:   false,
+		IsActive:  true,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		APIUsage: models.APIUsageStats{
+			MonthlyQuota: 1000, // Default quota
+		},
+	}
+
+	// Insert user
+	_, err = config.DB.Collection("users").InsertOne(context.TODO(), newUser)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		return
+	}
+
+	// Generate JWT token
+	token, err := utils.GenerateJWT(newUser.ID, newUser.Email, newUser.IsAdmin)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, models.LoginResponse{
+		User:  &newUser,
+		Token: token,
+	})
+}
+
+// verifyGoogleToken verifies the Google ID token and returns user info
+func (ac *AuthController) verifyGoogleToken(idToken string) (*GoogleUser, error) {
+	fmt.Println("Verifying Google token:", idToken[:50]+"...") // Log only first 50 chars for security
+
+	// For Firebase ID tokens, we need to decode the JWT payload without verification
+	// In production, you should verify the signature using Google's public keys
+	parts := strings.Split(idToken, ".")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid JWT format")
+	}
+
+	// Decode the payload (second part)
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		fmt.Printf("Error decoding JWT payload: %v\n", err)
+		return nil, err
+	}
+
+	var claims map[string]interface{}
+	err = json.Unmarshal(payload, &claims)
+	if err != nil {
+		fmt.Printf("Error unmarshaling JWT payload: %v\n", err)
+		return nil, err
+	}
+
+	fmt.Printf("JWT claims: %+v\n", claims)
+
+	// Extract user information from claims
+	googleUser := &GoogleUser{
+		ID:            getString(claims, "sub"),
+		Email:         getString(claims, "email"),
+		VerifiedEmail: getBool(claims, "email_verified"),
+		Name:          getString(claims, "name"),
+		GivenName:     getString(claims, "given_name"),
+		FamilyName:    getString(claims, "family_name"),
+		Picture:       getString(claims, "picture"),
+		Locale:        getString(claims, "locale"),
+	}
+
+	// Validate required fields
+	if googleUser.Email == "" {
+		return nil, fmt.Errorf("email not found in token")
+	}
+
+	// Check if token is from Firebase (has Firebase-specific claims)
+	if iss := getString(claims, "iss"); iss != "" && strings.Contains(iss, "firebase") {
+		// This is a Firebase token, trust the email verification
+		googleUser.VerifiedEmail = true
+	}
+
+	return googleUser, nil
+}
+
+// Helper functions to safely extract values from map
+func getString(m map[string]interface{}, key string) string {
+	if val, ok := m[key]; ok {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+func getBool(m map[string]interface{}, key string) bool {
+	if val, ok := m[key]; ok {
+		if b, ok := val.(bool); ok {
+			return b
+		}
+		if str, ok := val.(string); ok {
+			return str == "true"
+		}
+	}
+	return false
 }

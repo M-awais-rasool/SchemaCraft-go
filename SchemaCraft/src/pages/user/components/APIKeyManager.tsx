@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Key,
   Visibility,
@@ -10,25 +10,45 @@ import {
   Warning,
   CheckCircle
 } from '@mui/icons-material'
+import { UserService } from '../../../services/userService'
+import { useAuth } from '../../../contexts/AuthContext'
 
 const APIKeyManager = () => {
+  const { user, updateUser } = useAuth()
   const [showKey, setShowKey] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showRegenerateModal, setShowRegenerateModal] = useState(false)
+  const [isRegenerating, setIsRegenerating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const apiKey = "sk_live_51234567890abcdef1234567890abcdef"
-  const maskedKey = "sk_live_•••••••••••••••••••••••••••••••••••••"
+  const apiKey = user?.api_key || ''
+  const maskedKey = apiKey ? `${apiKey.substring(0, 8)}•••••••••••••••••••••••••••••••••••••` : ''
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(apiKey)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    if (apiKey) {
+      navigator.clipboard.writeText(apiKey)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
-  const handleRegenerate = () => {
-    setShowRegenerateModal(false)
-    // Here you would call API to regenerate key
-    alert('API Key regenerated successfully!')
+  const handleRegenerate = async () => {
+    try {
+      setIsRegenerating(true)
+      setError(null)
+      const response = await UserService.regenerateAPIKey()
+      
+      // Update user data
+      await updateUser()
+      
+      setShowRegenerateModal(false)
+      alert(`API Key regenerated successfully!\nNew key: ${response.api_key}`)
+    } catch (err: any) {
+      console.error('Failed to regenerate API key:', err)
+      setError(err.response?.data?.error || 'Failed to regenerate API key')
+    } finally {
+      setIsRegenerating(false)
+    }
   }
 
   return (
@@ -108,16 +128,31 @@ const APIKeyManager = () => {
         <div className="flex flex-col sm:flex-row gap-3 mt-6">
           <button
             onClick={() => setShowRegenerateModal(true)}
-            className="flex items-center justify-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+            disabled={isRegenerating}
+            className="flex items-center justify-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Refresh className="w-4 h-4" />
-            <span>Regenerate API Key</span>
+            <Refresh className={`w-4 h-4 ${isRegenerating ? 'animate-spin' : ''}`} />
+            <span>{isRegenerating ? 'Regenerating...' : 'Regenerate API Key'}</span>
           </button>
           <button className="flex items-center justify-center space-x-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
             <Security className="w-4 h-4" />
             <span>View Usage</span>
           </button>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg"
+          >
+            <div className="flex items-center space-x-2">
+              <Warning className="w-4 h-4 text-red-600" />
+              <span className="text-sm text-red-600">{error}</span>
+            </div>
+          </motion.div>
+        )}
       </motion.div>
 
       {/* Security Guidelines */}
@@ -186,9 +221,9 @@ const APIKeyManager = () => {
         <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
           <pre className="text-gray-100 text-sm">
 {`// Using your API key in JavaScript
-const response = await fetch('https://api.dynaschema.com/users', {
+const response = await fetch('${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/users', {
   headers: {
-    'Authorization': 'Bearer ${apiKey}',
+    'X-API-Key': '${apiKey}',
     'Content-Type': 'application/json'
   }
 });
@@ -219,13 +254,15 @@ const data = await response.json();`}
             <div className="flex space-x-3">
               <button
                 onClick={handleRegenerate}
-                className="flex-1 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+                disabled={isRegenerating}
+                className="flex-1 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Yes, Regenerate
+                {isRegenerating ? 'Regenerating...' : 'Yes, Regenerate'}
               </button>
               <button
                 onClick={() => setShowRegenerateModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={isRegenerating}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>

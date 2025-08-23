@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff, Sparkles, Heart, Star } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { auth, provider } from '../../firebase/firbase';
-import { signInWithPopup } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
@@ -23,25 +22,27 @@ interface FormErrors {
 export default function LoginScreen() {
     const [formData, setFormData] = useState<FormData>({ name: '', email: '', password: '' });
     const [errors, setErrors] = useState<FormErrors>({});
+    const [successMessage, setSuccessMessage] = useState<string>('');
     const [showPassword, setShowPassword] = useState(false);
     const [isSignUp, setIsSignUp] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
     const navigate = useNavigate();
+    const { login, signup, googleAuth, isAuthenticated, user, isLoading: authLoading } = useAuth();
 
     useEffect(() => { setMounted(true); }, []);
 
-    // useEffect(() => {
-    //     if (isAuth && user) {
-    //         redirectBasedOnRole(user.role);
-    //     }
-    // }, [isAuth, user]);
+    useEffect(() => {
+        if (!authLoading && isAuthenticated && user) {
+            redirectBasedOnRole(user.is_admin ? 'admin' : 'user');
+        }
+    }, [isAuthenticated, user, authLoading]);
 
     const redirectBasedOnRole = (role: string) => {
         if (role === 'admin') {
-            navigate('/admin/dashboard');
+            navigate('/admin');
         } else {
-            navigate('/shop');
+            navigate('/user');
         }
     };
 
@@ -51,6 +52,10 @@ export default function LoginScreen() {
         // Clear specific field error when user starts typing
         if (errors[name as keyof FormErrors]) {
             setErrors(prev => ({ ...prev, [name]: undefined }));
+        }
+        // Clear success message when user starts typing
+        if (successMessage) {
+            setSuccessMessage('');
         }
     };
 
@@ -84,14 +89,48 @@ export default function LoginScreen() {
 
         setIsLoading(true);
         setErrors({});
+        setSuccessMessage('');
+
+        try {
+            if (isSignUp) {
+                const result = await signup(formData.name, formData.email, formData.password);
+                if (result.success) {
+                    // Show success message and switch to login mode
+                    setSuccessMessage('Account created successfully! Please sign in with your credentials.');
+                    setIsSignUp(false);
+                    setFormData({ name: '', email: formData.email, password: '' });
+                }
+            } else {
+                await login(formData.email, formData.password);
+                // Navigation will be handled by the useEffect hook
+            }
+        } catch (error: any) {
+            console.error('Authentication error:', error);
+            setErrors({
+                general: error.response?.data?.error || 'Authentication failed. Please try again.',
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleGoogleLogin = async () => {
+    const handleGoogleLogin = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setErrors({});
+        setSuccessMessage('');
+        
         try {
-            const result = await signInWithPopup(auth, provider);
-            console.log("User Info:", result.user);
-        } catch (error) {
-            console.error("Google Sign-In Error", error);
+            await googleAuth();
+            // Navigation will be handled by the useEffect hook
+        } catch (error: any) {
+            console.error('Google Sign-In Error:', error);
+            const errorMessage = error.response?.data?.error || error.message || 'Google authentication failed. Please try again.';
+            setErrors({
+                general: errorMessage,
+            });
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -258,10 +297,15 @@ export default function LoginScreen() {
                             {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
                         </div>
 
-                        {/* General error message */}
+                        {/* General error/success message */}
                         {errors.general && (
                             <div className="text-red-500 text-sm text-center bg-red-50 p-3 rounded-lg">
                                 {errors.general}
+                            </div>
+                        )}
+                        {successMessage && (
+                            <div className="text-green-500 text-sm text-center bg-green-50 p-3 rounded-lg">
+                                {successMessage}
                             </div>
                         )}
 
@@ -312,7 +356,12 @@ export default function LoginScreen() {
                             {isSignUp ? 'Already have an account?' : "Don't have an account?"}
                             <button
                                 type="button"
-                                onClick={() => setIsSignUp(!isSignUp)}
+                                onClick={() => {
+                                    setIsSignUp(!isSignUp);
+                                    setErrors({});
+                                    setSuccessMessage('');
+                                    setFormData({ name: '', email: '', password: '' });
+                                }}
                                 className="text-black hover:text-gray-700 font-semibold ml-1 transition-colors"
                             >
                                 {isSignUp ? 'Login here' : 'Sign up here'}

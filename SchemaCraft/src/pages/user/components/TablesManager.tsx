@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Add,
@@ -10,62 +10,43 @@ import {
   Close,
   Save
 } from '@mui/icons-material'
-
-interface Field {
-  name: string
-  type: string
-  required: boolean
-}
-
-interface Table {
-  id: number
-  name: string
-  createdDate: string
-  endpoints: string[]
-  fields: Field[]
-}
+import { SchemaService, type Schema, type SchemaField } from '../../../services/schemaService'
 
 const TablesManager = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [tableName, setTableName] = useState('')
-  const [fields, setFields] = useState<Field[]>([
-    { name: 'id', type: 'String', required: true }
+  const [fields, setFields] = useState<SchemaField[]>([
+    { name: 'id', type: 'string', visibility: 'public', required: true }
   ])
+  const [schemas, setSchemas] = useState<Schema[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const [tables] = useState<Table[]>([
-    {
-      id: 1,
-      name: 'users',
-      createdDate: '2024-08-20',
-      endpoints: ['GET /api/users', 'POST /api/users', 'PUT /api/users/:id', 'DELETE /api/users/:id'],
-      fields: [
-        { name: 'id', type: 'String', required: true },
-        { name: 'name', type: 'String', required: true },
-        { name: 'email', type: 'String', required: true },
-        { name: 'age', type: 'Number', required: false }
-      ]
-    },
-    {
-      id: 2,
-      name: 'products',
-      createdDate: '2024-08-19',
-      endpoints: ['GET /api/products', 'POST /api/products', 'PUT /api/products/:id'],
-      fields: [
-        { name: 'id', type: 'String', required: true },
-        { name: 'title', type: 'String', required: true },
-        { name: 'price', type: 'Number', required: true },
-        { name: 'inStock', type: 'Boolean', required: false }
-      ]
+  const fieldTypes = ['string', 'number', 'boolean', 'array', 'object', 'date']
+
+  useEffect(() => {
+    fetchSchemas()
+  }, [])
+
+  const fetchSchemas = async () => {
+    try {
+      setLoading(true)
+      const data = await SchemaService.getSchemas()
+      setSchemas(data)
+    } catch (err: any) {
+      console.error('Failed to fetch schemas:', err)
+      setError(err.response?.data?.error || 'Failed to load schemas')
+    } finally {
+      setLoading(false)
     }
-  ])
-
-  const fieldTypes = ['String', 'Number', 'Boolean', 'Array', 'Object']
-
-  const addField = () => {
-    setFields([...fields, { name: '', type: 'String', required: false }])
   }
 
-  const updateField = (index: number, field: Partial<Field>) => {
+  const addField = () => {
+    setFields([...fields, { name: '', type: 'string', visibility: 'public', required: false }])
+  }
+
+  const updateField = (index: number, field: Partial<SchemaField>) => {
     const updatedFields = [...fields]
     updatedFields[index] = { ...updatedFields[index], ...field }
     setFields(updatedFields)
@@ -83,20 +64,81 @@ const TablesManager = () => {
       if (field.name) {
         schema[field.name] = {
           type: field.type,
-          required: field.required
+          required: field.required,
+          visibility: field.visibility
         }
       }
     })
     return JSON.stringify(schema, null, 2)
   }
 
-  const handleCreateTable = () => {
-    if (tableName && fields.every(f => f.name)) {
-      alert(`Table "${tableName}" created successfully!`)
+  const handleCreateTable = async () => {
+    if (!tableName || !fields.every(f => f.name)) {
+      setError('Please provide table name and ensure all fields have names')
+      return
+    }
+
+    try {
+      setCreating(true)
+      setError(null)
+      
+      await SchemaService.createSchema({
+        collection_name: tableName,
+        fields: fields
+      })
+      
+      // Refresh schemas list
+      await fetchSchemas()
+      
+      // Reset form
       setShowCreateModal(false)
       setTableName('')
-      setFields([{ name: 'id', type: 'String', required: true }])
+      setFields([{ name: 'id', type: 'string', visibility: 'public', required: true }])
+      
+      alert(`Table "${tableName}" created successfully!`)
+    } catch (err: any) {
+      console.error('Failed to create schema:', err)
+      setError(err.response?.data?.error || 'Failed to create table')
+    } finally {
+      setCreating(false)
     }
+  }
+
+  const handleDeleteSchema = async (schemaId: string) => {
+    if (!confirm('Are you sure you want to delete this schema? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await SchemaService.deleteSchema(schemaId)
+      await fetchSchemas()
+      alert('Schema deleted successfully!')
+    } catch (err: any) {
+      console.error('Failed to delete schema:', err)
+      alert(err.response?.data?.error || 'Failed to delete schema')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
+              <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-200 rounded"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -120,11 +162,25 @@ const TablesManager = () => {
         </button>
       </motion.div>
 
+      {/* Error Message */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-50 border border-red-200 rounded-xl p-4"
+        >
+          <div className="flex items-center space-x-2">
+            <Delete className="w-4 h-4 text-red-600" />
+            <span className="text-sm text-red-600">{error}</span>
+          </div>
+        </motion.div>
+      )}
+
       {/* Tables Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {tables.map((table, index) => (
+        {schemas.length > 0 ? schemas.map((schema, index) => (
           <motion.div
-            key={table.id}
+            key={schema.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
@@ -136,17 +192,21 @@ const TablesManager = () => {
                   <TableChart className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">{table.name}</h3>
-                  <p className="text-xs text-gray-500">Created {table.createdDate}</p>
+                  <h3 className="font-semibold text-gray-900">{schema.collection_name}</h3>
+                  <p className="text-xs text-gray-500">
+                    Created {new Date(schema.created_at).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-3 mb-4">
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Fields ({table.fields.length})</h4>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">
+                  Fields ({schema.fields.length})
+                </h4>
                 <div className="space-y-1">
-                  {table.fields.slice(0, 3).map((field, idx) => (
+                  {schema.fields.slice(0, 3).map((field, idx) => (
                     <div key={idx} className="flex items-center justify-between text-xs">
                       <span className="font-mono text-gray-600">{field.name}</span>
                       <div className="flex items-center space-x-1">
@@ -157,8 +217,8 @@ const TablesManager = () => {
                       </div>
                     </div>
                   ))}
-                  {table.fields.length > 3 && (
-                    <p className="text-xs text-gray-500">+{table.fields.length - 3} more</p>
+                  {schema.fields.length > 3 && (
+                    <p className="text-xs text-gray-500">+{schema.fields.length - 3} more</p>
                   )}
                 </div>
               </div>
@@ -166,14 +226,18 @@ const TablesManager = () => {
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-2">API Endpoints</h4>
                 <div className="space-y-1">
-                  {table.endpoints.slice(0, 2).map((endpoint, idx) => (
-                    <div key={idx} className="text-xs font-mono text-gray-600 bg-gray-50 px-2 py-1 rounded">
-                      {endpoint}
-                    </div>
-                  ))}
-                  {table.endpoints.length > 2 && (
-                    <p className="text-xs text-gray-500">+{table.endpoints.length - 2} more</p>
-                  )}
+                  <div className="text-xs font-mono text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                    GET /api/{schema.collection_name}
+                  </div>
+                  <div className="text-xs font-mono text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                    POST /api/{schema.collection_name}
+                  </div>
+                  <div className="text-xs font-mono text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                    PUT /api/{schema.collection_name}/:id
+                  </div>
+                  <div className="text-xs font-mono text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                    DELETE /api/{schema.collection_name}/:id
+                  </div>
                 </div>
               </div>
             </div>
@@ -190,12 +254,28 @@ const TablesManager = () => {
                   <Code className="w-4 h-4" />
                 </button>
               </div>
-              <button className="p-1 text-gray-400 hover:text-black transition-colors">
+              <button 
+                onClick={() => handleDeleteSchema(schema.id)}
+                className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+              >
                 <Delete className="w-4 h-4" />
               </button>
             </div>
           </motion.div>
-        ))}
+        )) : (
+          <div className="col-span-full bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+            <TableChart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Tables Yet</h3>
+            <p className="text-gray-600 mb-6">Create your first table to start building APIs</p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors mx-auto"
+            >
+              <Add className="w-4 h-4" />
+              <span>Create Your First Table</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Create Table Modal */}
@@ -270,6 +350,14 @@ const TablesManager = () => {
                                   <option key={type} value={type}>{type}</option>
                                 ))}
                               </select>
+                              <select
+                                value={field.visibility}
+                                onChange={(e) => updateField(index, { visibility: e.target.value })}
+                                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                              >
+                                <option value="public">Public</option>
+                                <option value="private">Private</option>
+                              </select>
                               <label className="flex items-center space-x-1">
                                 <input
                                   type="checkbox"
@@ -341,16 +429,18 @@ const TablesManager = () => {
               <div className="flex justify-end space-x-3 p-6 border-t border-gray-200">
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={creating}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleCreateTable}
-                  className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+                  disabled={creating || !tableName || !fields.every(f => f.name)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save className="w-4 h-4" />
-                  <span>Create Table</span>
+                  <span>{creating ? 'Creating...' : 'Create Table'}</span>
                 </button>
               </div>
             </motion.div>
