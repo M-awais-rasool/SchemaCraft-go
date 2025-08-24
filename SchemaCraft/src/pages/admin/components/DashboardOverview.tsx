@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   TrendingUp,
@@ -6,44 +7,79 @@ import {
   Api,
   Error,
   CheckCircle,
-  MoreVert
+  MoreVert,
+  Refresh
 } from '@mui/icons-material'
+import AdminService from '../../../services/adminService'
+import type { AdminStats } from '../../../services/adminService'
 
 const DashboardOverview = () => {
-  const stats = [
-    {
-      title: 'Total Users',
-      value: '2,547',
-      change: '+12.5%',
-      changeType: 'increase',
-      icon: People,
-      color: 'bg-black'
-    },
-    {
-      title: 'Active APIs',
-      value: '1,234',
-      change: '+8.2%',
-      changeType: 'increase',
-      icon: Api,
-      color: 'bg-black'
-    },
-    {
-      title: 'API Calls Today',
-      value: '45,678',
-      change: '+15.3%',
-      changeType: 'increase',
-      icon: TrendingUp,
-      color: 'bg-black'
-    },
-    {
-      title: 'Errors',
-      value: '23',
-      change: '-5.1%',
-      changeType: 'decrease',
-      icon: Error,
-      color: 'bg-black'
+  const [stats, setStats] = useState<AdminStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+
+  useEffect(() => {
+    fetchStats()
+  }, [])
+
+  const fetchStats = async () => {
+    try {
+      setError(null)
+      const data = await AdminService.getStats()
+      setStats(data)
+    } catch (err: any) {
+      console.error('Failed to fetch admin stats:', err)
+      setError(err.response?.data?.error || 'Failed to load dashboard data')
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await fetchStats()
+    setRefreshing(false)
+  }
+
+  const getStatsCards = () => {
+    if (!stats) return []
+    
+    return [
+      {
+        title: 'Total Users',
+        value: stats.total_users.toLocaleString(),
+        change: '+12.5%', // You can calculate this based on historical data
+        changeType: 'increase' as const,
+        icon: People,
+        color: 'bg-black'
+      },
+      {
+        title: 'Active Users',
+        value: stats.active_users.toLocaleString(),
+        change: '+8.2%',
+        changeType: 'increase' as const,
+        icon: CheckCircle,
+        color: 'bg-black'
+      },
+      {
+        title: 'Total Schemas',
+        value: stats.total_schemas.toLocaleString(),
+        change: '+15.3%',
+        changeType: 'increase' as const,
+        icon: Api,
+        color: 'bg-black'
+      },
+      {
+        title: 'API Requests',
+        value: stats.total_api_requests.toLocaleString(),
+        change: '+23.1%',
+        changeType: 'increase' as const,
+        icon: TrendingUp,
+        color: 'bg-black'
+      }
+    ]
+  }
 
   const recentActivities = [
     { id: 1, user: 'John Doe', action: 'Created new API', time: '2 minutes ago', status: 'success' },
@@ -61,6 +97,31 @@ const DashboardOverview = () => {
     { name: 'Analytics API', calls: 3210, status: 'active' },
   ]
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="flex items-center">
+          <Error className="w-5 h-5 text-red-500 mr-2" />
+          <span className="text-red-700">{error}</span>
+          <button 
+            onClick={handleRefresh}
+            className="ml-auto bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded text-sm"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -74,6 +135,14 @@ const DashboardOverview = () => {
           <p className="text-gray-600 mt-1">Welcome back! Here's what's happening with your platform today.</p>
         </div>
         <div className="mt-4 sm:mt-0 flex space-x-3">
+          <button 
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center disabled:opacity-50"
+          >
+            <Refresh className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
           <button className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
             Export Data
           </button>
@@ -85,7 +154,7 @@ const DashboardOverview = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
+        {getStatsCards().map((stat, index) => (
           <motion.div
             key={stat.title}
             initial={{ opacity: 0, y: 20 }}
@@ -158,14 +227,14 @@ const DashboardOverview = () => {
                 <div className="w-3 h-3 bg-black rounded-full mr-3"></div>
                 <span className="text-gray-700">Active Users</span>
               </div>
-              <span className="font-semibold text-gray-900">2,234</span>
+              <span className="font-semibold text-gray-900">{stats?.active_users?.toLocaleString() || '0'}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <div className="w-3 h-3 bg-gray-400 rounded-full mr-3"></div>
                 <span className="text-gray-700">Inactive Users</span>
               </div>
-              <span className="font-semibold text-gray-900">313</span>
+              <span className="font-semibold text-gray-900">{stats?.inactive_users?.toLocaleString() || '0'}</span>
             </div>
             <div className="mt-6">
               <div className="h-40 bg-gray-50 rounded-lg flex items-center justify-center">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   Add,
@@ -6,106 +6,142 @@ import {
   Search,
   MoreVert,
   Edit,
-  Delete,
   Block,
   CheckCircle,
   Email,
   Person,
-  AdminPanelSettings
+  AdminPanelSettings,
+  Refresh,
+  Error,
+  Key
 } from '@mui/icons-material'
+import AdminService from '../../../services/adminService'
+import type { User } from '../../../types/auth'
+import type { PaginatedUsers } from '../../../services/adminService'
 
 const UserManagement = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterRole, setFilterRole] = useState('all')
+  const [users, setUsers] = useState<User[]>([])
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({})
 
-  const users = [
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john.doe@example.com',
-      role: 'Developer',
-      status: 'Active',
-      apiKeys: 3,
-      lastLogin: '2024-08-20',
-      joinDate: '2024-01-15',
-      avatar: 'JD'
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      email: 'jane.smith@example.com',
-      role: 'Admin',
-      status: 'Active',
-      apiKeys: 5,
-      lastLogin: '2024-08-22',
-      joinDate: '2023-12-10',
-      avatar: 'JS'
-    },
-    {
-      id: 3,
-      name: 'Mike Johnson',
-      email: 'mike.johnson@example.com',
-      role: 'Developer',
-      status: 'Inactive',
-      apiKeys: 1,
-      lastLogin: '2024-08-15',
-      joinDate: '2024-03-20',
-      avatar: 'MJ'
-    },
-    {
-      id: 4,
-      name: 'Sarah Wilson',
-      email: 'sarah.wilson@example.com',
-      role: 'Manager',
-      status: 'Active',
-      apiKeys: 7,
-      lastLogin: '2024-08-21',
-      joinDate: '2023-11-05',
-      avatar: 'SW'
-    },
-    {
-      id: 5,
-      name: 'David Brown',
-      email: 'david.brown@example.com',
-      role: 'Developer',
-      status: 'Suspended',
-      apiKeys: 2,
-      lastLogin: '2024-08-10',
-      joinDate: '2024-02-28',
-      avatar: 'DB'
+  useEffect(() => {
+    fetchUsers()
+  }, [pagination.page, pagination.limit])
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data: PaginatedUsers = await AdminService.getAllUsers(pagination.page, pagination.limit)
+      setUsers(data.users)
+      setPagination(prev => ({
+        ...prev,
+        total: data.pagination.total,
+        totalPages: data.pagination.totalPages
+      }))
+    } catch (err: any) {
+      console.error('Failed to fetch users:', err)
+      setError(err.response?.data?.error || 'Failed to load users')
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
+
+  const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
+    try {
+      setActionLoading(prev => ({ ...prev, [userId]: true }))
+      await AdminService.toggleUserStatus(userId, !currentStatus)
+      // Refresh the user list
+      await fetchUsers()
+    } catch (err: any) {
+      console.error('Failed to toggle user status:', err)
+      alert(err.response?.data?.error || 'Failed to update user status')
+    } finally {
+      setActionLoading(prev => ({ ...prev, [userId]: false }))
+    }
+  }
+
+  const handleRevokeAPIKey = async (userId: string) => {
+    if (!confirm('Are you sure you want to revoke this user\'s API key? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      setActionLoading(prev => ({ ...prev, [`revoke-${userId}`]: true }))
+      await AdminService.revokeUserAPIKey(userId)
+      // Refresh the user list
+      await fetchUsers()
+      alert('API key revoked successfully')
+    } catch (err: any) {
+      console.error('Failed to revoke API key:', err)
+      alert(err.response?.data?.error || 'Failed to revoke API key')
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`revoke-${userId}`]: false }))
+    }
+  }
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = filterStatus === 'all' || user.status.toLowerCase() === filterStatus
-    const matchesRole = filterRole === 'all' || user.role.toLowerCase() === filterRole
+    const matchesStatus = filterStatus === 'all' || 
+                         (filterStatus === 'active' && user.is_active) ||
+                         (filterStatus === 'inactive' && !user.is_active)
+    const matchesRole = filterRole === 'all' || 
+                       (filterRole === 'admin' && user.is_admin) ||
+                       (filterRole === 'user' && !user.is_admin)
 
     return matchesSearch && matchesStatus && matchesRole
   })
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'Active':
-        return 'bg-black text-white'
-      case 'Suspended':
-        return 'bg-gray-100 text-gray-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
+  const getStatusColor = (isActive: boolean) => {
+    return isActive ? 'bg-black text-white' : 'bg-gray-100 text-gray-800'
   }
 
-  const getRoleIcon = (role: string) => {
-    switch (role.toLowerCase()) {
-      case 'admin':
-        return <AdminPanelSettings className="w-4 h-4" />
-      case 'manager':
-        return <Person className="w-4 h-4" />
-      default:
-        return <Person className="w-4 h-4" />
-    }
+  const getRoleIcon = (isAdmin: boolean) => {
+    return isAdmin ? <AdminPanelSettings className="w-4 h-4" /> : <Person className="w-4 h-4" />
+  }
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase()
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="flex items-center">
+          <Error className="w-5 h-5 text-red-500 mr-2" />
+          <span className="text-red-700">{error}</span>
+          <button 
+            onClick={fetchUsers}
+            className="ml-auto bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded text-sm"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -120,7 +156,14 @@ const UserManagement = () => {
           <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600 mt-1">Manage and monitor all users on your platform.</p>
         </div>
-        <div className="mt-4 sm:mt-0">
+        <div className="mt-4 sm:mt-0 flex space-x-3">
+          <button 
+            onClick={fetchUsers}
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center"
+          >
+            <Refresh className="w-4 h-4 mr-2" />
+            Refresh
+          </button>
           <button className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-all flex items-center space-x-2">
             <Add className="w-4 h-4" />
             <span>Add New User</span>
@@ -168,8 +211,7 @@ const UserManagement = () => {
             >
               <option value="all">All Roles</option>
               <option value="admin">Admin</option>
-              <option value="manager">Manager</option>
-              <option value="developer">Developer</option>
+              <option value="user">User</option>
             </select>
 
             <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
@@ -211,7 +253,7 @@ const UserManagement = () => {
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white font-semibold">
-                        {user.avatar}
+                        {getInitials(user.name)}
                       </div>
                       <div>
                         <p className="font-medium text-gray-900">{user.name}</p>
@@ -221,38 +263,50 @@ const UserManagement = () => {
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-2">
-                      {getRoleIcon(user.role)}
-                      <span className="text-sm text-gray-900">{user.role}</span>
+                      {getRoleIcon(user.is_admin)}
+                      <span className="text-sm text-gray-900">{user.is_admin ? 'Admin' : 'User'}</span>
                     </div>
                   </td>
                   <td className="py-4 px-6">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(user.status)}`}>
-                      {user.status === 'Active' && <CheckCircle className="w-3 h-3 mr-1" />}
-                      {user.status}
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(user.is_active)}`}>
+                      {user.is_active && <CheckCircle className="w-3 h-3 mr-1" />}
+                      {user.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="py-4 px-6">
-                    <span className="text-sm font-medium text-gray-900">{user.apiKeys}</span>
+                    <span className="text-sm font-medium text-gray-900">{user.api_key ? '1' : '0'}</span>
                   </td>
                   <td className="py-4 px-6">
-                    <span className="text-sm text-gray-500">{user.lastLogin}</span>
+                    <span className="text-sm text-gray-500">{user.last_login ? formatDate(user.last_login) : 'Never'}</span>
                   </td>
                   <td className="py-4 px-6">
-                    <span className="text-sm text-gray-500">{user.joinDate}</span>
+                    <span className="text-sm text-gray-500">{formatDate(user.created_at)}</span>
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center justify-end space-x-2">
                       <button className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
                         <Email className="w-4 h-4 text-gray-400 hover:text-black" />
                       </button>
-                      <button className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
-                        <Edit className="w-4 h-4 text-gray-400 hover:text-black" />
-                      </button>
-                      <button className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                      <button 
+                        onClick={() => handleToggleUserStatus(user.id, user.is_active)}
+                        disabled={actionLoading[user.id]}
+                        className="p-1 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                        title={user.is_active ? 'Deactivate user' : 'Activate user'}
+                      >
                         <Block className="w-4 h-4 text-gray-400 hover:text-black" />
                       </button>
+                      {user.api_key && (
+                        <button 
+                          onClick={() => handleRevokeAPIKey(user.id)}
+                          disabled={actionLoading[`revoke-${user.id}`]}
+                          className="p-1 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                          title="Revoke API key"
+                        >
+                          <Key className="w-4 h-4 text-gray-400 hover:text-black" />
+                        </button>
+                      )}
                       <button className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
-                        <Delete className="w-4 h-4 text-gray-400 hover:text-black" />
+                        <Edit className="w-4 h-4 text-gray-400 hover:text-black" />
                       </button>
                       <button className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
                         <MoreVert className="w-4 h-4 text-gray-400" />
@@ -269,22 +323,42 @@ const UserManagement = () => {
         <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t border-gray-200">
           <div className="flex items-center space-x-2 text-sm text-gray-500">
             <span>Showing</span>
-            <span className="font-medium text-gray-900">1-{filteredUsers.length}</span>
+            <span className="font-medium text-gray-900">
+              {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)}
+            </span>
             <span>of</span>
-            <span className="font-medium text-gray-900">{users.length}</span>
+            <span className="font-medium text-gray-900">{pagination.total}</span>
             <span>users</span>
           </div>
           <div className="flex items-center space-x-2">
-            <button className="px-3 py-1 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+            <button 
+              onClick={() => setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+              disabled={pagination.page === 1}
+              className="px-3 py-1 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               Previous
             </button>
-            <button className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors">
-              1
-            </button>
-            <button className="px-3 py-1 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors">
-              2
-            </button>
-            <button className="px-3 py-1 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+              const pageNum = i + 1;
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setPagination(prev => ({ ...prev, page: pageNum }))}
+                  className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                    pagination.page === pageNum
+                      ? 'bg-black text-white'
+                      : 'border border-gray-300 text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+            <button 
+              onClick={() => setPagination(prev => ({ ...prev, page: Math.min(prev.totalPages, prev.page + 1) }))}
+              disabled={pagination.page === pagination.totalPages}
+              className="px-3 py-1 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               Next
             </button>
           </div>

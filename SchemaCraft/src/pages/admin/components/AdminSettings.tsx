@@ -14,7 +14,6 @@ import {
   DarkMode,
   LightMode,
   Edit,
-  Delete
 } from '@mui/icons-material'
 
 const AdminSettings = () => {

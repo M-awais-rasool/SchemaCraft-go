@@ -3,10 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Dashboard as DashboardIcon,
   People,
-  Api,
-  Storage,
   Description,
-  Assessment,
   Payment,
   Settings,
   Logout,
@@ -19,9 +16,7 @@ import {
 // Import dashboard components
 import DashboardOverview from './components/DashboardOverview'
 import UserManagement from './components/UserManagement'
-import APIManagement from './components/APIManagement'
 import DatabaseManagement from './components/DatabaseManagement'
-import ReportsAnalytics from './components/ReportsAnalytics'
 import PaymentsSubscriptions from './components/PaymentsSubscriptions'
 import AdminSettings from './components/AdminSettings'
 
@@ -35,10 +30,7 @@ const AdminDashboard = () => {
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
     { id: 'users', label: 'Users Management', icon: People },
-    { id: 'apis', label: 'API Management', icon: Api },
-    { id: 'database', label: 'Database Connections', icon: Storage },
     { id: 'swagger', label: 'Swagger Schema', icon: Description },
-    { id: 'reports', label: 'Reports & Analytics', icon: Assessment },
     { id: 'payments', label: 'Payments & Subscriptions', icon: Payment },
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
@@ -56,14 +48,10 @@ const AdminDashboard = () => {
         return <DashboardOverview />
       case 'users':
         return <UserManagement />
-      case 'apis':
-        return <APIManagement />
       case 'database':
         return <DatabaseManagement />
       case 'swagger':
         return <div className="p-6">Swagger Schema Management - Coming Soon</div>
-      case 'reports':
-        return <ReportsAnalytics />
       case 'payments':
         return <PaymentsSubscriptions />
       case 'settings':
