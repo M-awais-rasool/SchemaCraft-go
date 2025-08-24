@@ -8,11 +8,14 @@ import {
   Visibility,
   Code,
   Close,
-  Save
+  Save,
+  Warning
 } from '@mui/icons-material'
 import { SchemaService, type Schema, type SchemaField } from '../../../services/schemaService'
+import { useAuth } from '../../../contexts/AuthContext'
 
 const TablesManager = () => {
+  const { user } = useAuth()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [tableName, setTableName] = useState('')
   const [fields, setFields] = useState<SchemaField[]>([
@@ -24,6 +27,9 @@ const TablesManager = () => {
   const [error, setError] = useState<string | null>(null)
 
   const fieldTypes = ['string', 'number', 'boolean', 'array', 'object', 'date']
+
+  // Check if user has MongoDB connection configured
+  const hasMongoConnection = user?.mongodb_uri && user?.database_name
 
   useEffect(() => {
     fetchSchemas()
@@ -73,6 +79,11 @@ const TablesManager = () => {
   }
 
   const handleCreateTable = async () => {
+    if (!hasMongoConnection) {
+      setError('Please first add a MongoDB connection')
+      return
+    }
+
     if (!tableName || !fields.every(f => f.name)) {
       setError('Please provide table name and ensure all fields have names')
       return
@@ -154,13 +165,35 @@ const TablesManager = () => {
           <p className="text-gray-600 mt-1">Create and manage your database tables and API endpoints</p>
         </div>
         <button
-          onClick={() => setShowCreateModal(true)}
-          className="mt-4 sm:mt-0 flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+          onClick={() => hasMongoConnection ? setShowCreateModal(true) : setError('Please first add a MongoDB connection')}
+          disabled={!hasMongoConnection}
+          className={`mt-4 sm:mt-0 flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+            hasMongoConnection 
+              ? 'bg-black text-white hover:bg-gray-800' 
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
         >
           <Add className="w-4 h-4" />
           <span>Create New Table</span>
         </button>
       </motion.div>
+
+      {/* MongoDB Connection Warning */}
+      {!hasMongoConnection && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-yellow-50 border border-yellow-200 rounded-xl p-4"
+        >
+          <div className="flex items-center space-x-2">
+            <Warning className="w-4 h-4 text-yellow-600" />
+            <span className="text-sm text-yellow-600">
+              Please configure your MongoDB connection first before creating tables. 
+              Go to the MongoDB Connection tab to set up your database.
+            </span>
+          </div>
+        </motion.div>
+      )}
 
       {/* Error Message */}
       {error && (

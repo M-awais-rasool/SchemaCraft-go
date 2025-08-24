@@ -40,6 +40,20 @@ func (sc *SchemaController) CreateSchema(c *gin.Context) {
 		return
 	}
 
+	// Get user info to check if MongoDB URI is configured
+	var user models.User
+	err := config.DB.Collection("users").FindOne(context.TODO(), bson.M{"_id": userID}).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user info"})
+		return
+	}
+
+	// Check if user has configured MongoDB URI
+	if user.MongoDBURI == "" || user.DatabaseName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please first add a MongoDB connection"})
+		return
+	}
+
 	var req models.CreateSchemaRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -49,11 +63,11 @@ func (sc *SchemaController) CreateSchema(c *gin.Context) {
 	// Check if schema already exists for this user
 	var existingSchema models.Schema
 	filter := bson.M{"user_id": userID, "collection_name": req.CollectionName}
-	err := config.DB.Collection("schemas").FindOne(context.TODO(), filter).Decode(&existingSchema)
-	if err == nil {
+	schemaErr := config.DB.Collection("schemas").FindOne(context.TODO(), filter).Decode(&existingSchema)
+	if schemaErr == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Schema already exists for this collection"})
 		return
-	} else if err != mongo.ErrNoDocuments {
+	} else if schemaErr != mongo.ErrNoDocuments {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
@@ -148,7 +162,7 @@ func (sc *SchemaController) GetSchemas(c *gin.Context) {
 // @Success 200 "Success"
 // @Failure 401 "Unauthorized"
 // @Failure 404 "Not Found"
-// @Failure 500 "Internal Server Error"	
+// @Failure 500 "Internal Server Error"
 // @Router /schemas/{id} [get]
 func (sc *SchemaController) GetSchemaByID(c *gin.Context) {
 	userID, exists := c.Get("user_id")

@@ -9,12 +9,15 @@ import {
   Delete,
   Visibility,
   NavigateBefore,
-  NavigateNext
+  NavigateNext,
+  Warning
 } from '@mui/icons-material'
 import { SchemaService, type Schema } from '../../../services/schemaService'
 import { DataService, type DataRecord, type PaginatedResponse } from '../../../services/dataService'
+import { useAuth } from '../../../contexts/AuthContext'
 
 const DataViewer = () => {
+  const { user } = useAuth()
   const [schemas, setSchemas] = useState<Schema[]>([])
   const [selectedTable, setSelectedTable] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -27,6 +30,9 @@ const DataViewer = () => {
   const [newRecord, setNewRecord] = useState<Record<string, any>>({})
 
   const recordsPerPage = 10
+
+  // Check if user has MongoDB connection configured
+  const hasMongoConnection = user?.mongodb_uri && user?.database_name
 
   useEffect(() => {
     fetchSchemas()
@@ -90,6 +96,11 @@ const DataViewer = () => {
   }
 
   const handleAddRecord = async () => {
+    if (!hasMongoConnection) {
+      alert('Please configure your MongoDB connection first')
+      return
+    }
+
     if (!selectedTable) return
 
     try {
@@ -182,13 +193,35 @@ const DataViewer = () => {
           <p className="text-gray-600 mt-1">View and manage your table data</p>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
-          className="mt-4 sm:mt-0 flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+          onClick={() => hasMongoConnection ? setShowAddModal(true) : setError('Please configure your MongoDB connection first')}
+          disabled={!hasMongoConnection}
+          className={`mt-4 sm:mt-0 flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+            hasMongoConnection 
+              ? 'bg-black text-white hover:bg-gray-800' 
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
         >
           <Add className="w-4 h-4" />
           <span>Add Record</span>
         </button>
       </motion.div>
+
+      {/* MongoDB Connection Warning */}
+      {!hasMongoConnection && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-yellow-50 border border-yellow-200 rounded-xl p-4"
+        >
+          <div className="flex items-center space-x-2">
+            <Warning className="w-4 h-4 text-yellow-600" />
+            <span className="text-sm text-yellow-600">
+              Please configure your MongoDB connection first before viewing data. 
+              Go to the MongoDB Connection tab to set up your database.
+            </span>
+          </div>
+        </motion.div>
+      )}
 
       {/* Controls */}
       <motion.div

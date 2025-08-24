@@ -44,17 +44,18 @@ const MongoConnection = () => {
     setConnectionStatus('connecting')
     setError(null)
     
-    // Simple validation - in real app, this would test actual connection
-    setTimeout(() => {
-      if (mongoUri.includes('mongodb://') || mongoUri.includes('mongodb+srv://')) {
-        setConnectionStatus('connected')
-        setError(null)
-      } else {
-        setConnectionStatus('error')
-        setError('Invalid MongoDB connection string format')
-      }
+    try {
+      // Actually test the connection by calling the backend
+      await AuthService.updateMongoURI(mongoUri, databaseName)
+      setConnectionStatus('connected')
+      setError(null)
+    } catch (err: any) {
+      console.error('MongoDB connection test failed:', err)
+      setConnectionStatus('error')
+      setError(err.response?.data?.error || 'Failed to connect to MongoDB')
+    } finally {
       setIsLoading(false)
-    }, 2000)
+    }
   }
 
   const handleSave = async () => {
@@ -67,13 +68,13 @@ const MongoConnection = () => {
       setIsSaving(true)
       setError(null)
       
-      await AuthService.updateMongoURI(mongoUri, databaseName)
+      // Connection is already tested and saved during test, just update user context
       await updateUser()
       
       alert('MongoDB connection saved successfully!')
     } catch (err: any) {
-      console.error('Failed to save MongoDB connection:', err)
-      setError(err.response?.data?.error || 'Failed to save MongoDB connection')
+      console.error('Failed to update user context:', err)
+      setError('Failed to update user information')
     } finally {
       setIsSaving(false)
     }

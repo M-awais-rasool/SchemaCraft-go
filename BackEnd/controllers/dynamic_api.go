@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -26,15 +27,15 @@ func NewDynamicAPIController() *DynamicAPIController {
 func (dc *DynamicAPIController) getUserDatabase(c *gin.Context) (*mongo.Database, error) {
 	apiUser, exists := c.Get("api_user")
 	if !exists {
-		return nil, gin.Error{Err: gin.Error{}, Type: gin.ErrorTypePublic}
+		return nil, errors.New("user not found in context")
 	}
 
 	user := apiUser.(models.User)
-	if user.MongoDBURI != "" && user.DatabaseName != "" {
-		return config.GetUserDatabase(user.MongoDBURI, user.DatabaseName)
+	if user.MongoDBURI == "" || user.DatabaseName == "" {
+		return nil, errors.New("MongoDB connection not configured")
 	}
 
-	return config.DB, nil
+	return config.GetUserDatabase(user.MongoDBURI, user.DatabaseName)
 }
 
 // Helper function to get schema by collection name
@@ -107,7 +108,11 @@ func (dc *DynamicAPIController) CreateDocument(c *gin.Context) {
 	// Get user's database
 	db, err := dc.getUserDatabase(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		if err.Error() == "MongoDB connection not configured" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Please configure your MongoDB connection first"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error: " + err.Error()})
+		}
 		return
 	}
 
@@ -188,7 +193,11 @@ func (dc *DynamicAPIController) GetDocuments(c *gin.Context) {
 	// Get user's database
 	db, err := dc.getUserDatabase(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		if err.Error() == "MongoDB connection not configured" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Please configure your MongoDB connection first"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error: " + err.Error()})
+		}
 		return
 	}
 
@@ -286,7 +295,11 @@ func (dc *DynamicAPIController) GetDocumentByID(c *gin.Context) {
 	// Get user's database
 	db, err := dc.getUserDatabase(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		if err.Error() == "MongoDB connection not configured" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Please configure your MongoDB connection first"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error: " + err.Error()})
+		}
 		return
 	}
 
@@ -354,7 +367,11 @@ func (dc *DynamicAPIController) UpdateDocument(c *gin.Context) {
 	// Get user's database
 	db, err := dc.getUserDatabase(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		if err.Error() == "MongoDB connection not configured" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Please configure your MongoDB connection first"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error: " + err.Error()})
+		}
 		return
 	}
 
@@ -427,7 +444,11 @@ func (dc *DynamicAPIController) DeleteDocument(c *gin.Context) {
 	// Get user's database
 	db, err := dc.getUserDatabase(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		if err.Error() == "MongoDB connection not configured" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Please configure your MongoDB connection first"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error: " + err.Error()})
+		}
 		return
 	}
 

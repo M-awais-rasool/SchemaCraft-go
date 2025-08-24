@@ -215,9 +215,9 @@ func (ac *AuthController) UpdateMongoURI(c *gin.Context) {
 	}
 
 	// Test connection to the provided MongoDB URI
-	_, err := config.GetUserDatabase(req.MongoDBURI, req.DatabaseName)
+	err := config.TestMongoConnection(req.MongoDBURI, req.DatabaseName)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid MongoDB URI or database name"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to connect to MongoDB: " + err.Error()})
 		return
 	}
 
