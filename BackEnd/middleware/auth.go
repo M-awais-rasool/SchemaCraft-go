@@ -11,7 +11,9 @@ import (
 	"schemacraft-backend/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func AuthMiddleware() gin.HandlerFunc {
@@ -90,6 +92,140 @@ func AdminMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		c.Next()
+	}
+}
+
+func DynamicAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		collection := c.Param("collection")
+		if collection == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Collection parameter required"})
+			c.Abort()
+			return
+		}
+
+		// Skip auth endpoints
+		path := c.Request.URL.Path
+		if strings.Contains(path, "/auth/") {
+			c.Next()
+			return
+		}
+
+		// Get API user first
+		apiUserID, exists := c.Get("api_user_id")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			c.Abort()
+			return
+		}
+
+		userID := apiUserID.(primitive.ObjectID)
+
+		// Check if auth is enabled for this collection
+		var schema models.Schema
+		filter := bson.M{"user_id": userID, "collection_name": collection, "is_active": true}
+		err := config.DB.Collection("schemas").FindOne(context.TODO(), filter).Decode(&schema)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Schema not found"})
+			c.Abort()
+			return
+		}
+
+		// Check if the current endpoint requires protection
+		method := strings.ToLower(c.Request.Method)
+		requiresAuth := false
+
+		if schema.EndpointProtection != nil {
+			switch method {
+			case "get":
+				requiresAuth = schema.EndpointProtection.Get
+			case "post":
+				requiresAuth = schema.EndpointProtection.Post
+			case "put":
+				requiresAuth = schema.EndpointProtection.Put
+			case "delete":
+				requiresAuth = schema.EndpointProtection.Delete
+			}
+		}
+
+		// If no protection required for this endpoint, proceed
+		if !requiresAuth {
+			c.Next()
+			return
+		}
+
+		// Auth is required, validate token
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			c.Abort()
+			return
+		}
+
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		if tokenString == authHeader {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Bearer token required"})
+			c.Abort()
+			return
+		}
+
+		// If auth is required but no auth config exists, check for a valid auth system
+		if schema.AuthConfig == nil || !schema.AuthConfig.Enabled {
+			// Look for any available auth system for this user
+			var authSchema models.Schema
+			authFilter := bson.M{
+				"user_id":             userID,
+				"auth_config.enabled": true,
+				"is_active":           true,
+			}
+			err := config.DB.Collection("schemas").FindOne(context.TODO(), authFilter).Decode(&authSchema)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required but no auth system configured"})
+				c.Abort()
+				return
+			}
+
+			// Use the auth system from the found schema
+			schema.AuthConfig = authSchema.AuthConfig
+		}
+
+		// Validate token
+		jwtSecret := schema.AuthConfig.JWTSecret
+		if jwtSecret == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "JWT secret not configured"})
+			c.Abort()
+			return
+		}
+
+		token, err := jwt.ParseWithClaims(tokenString, &models.DynamicAuthClaims{}, func(token *jwt.Token) (interface{}, error) {
+			return []byte(jwtSecret), nil
+		})
+
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.Abort()
+			return
+		}
+
+		claims, ok := token.Claims.(*models.DynamicAuthClaims)
+		if !ok || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			c.Abort()
+			return
+		}
+
+		// Verify token belongs to this user (collection doesn't need to match for cross-table auth)
+		if claims.UserID != userID {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token not valid for this user"})
+			c.Abort()
+			return
+		}
+
+		// Store dynamic auth info in context
+		c.Set("dynamic_auth_user_id", claims.SchemaUserID)
+		c.Set("dynamic_auth_schema_id", claims.SchemaID)
+
 		c.Next()
 	}
 }

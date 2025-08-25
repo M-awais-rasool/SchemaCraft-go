@@ -9,11 +9,35 @@ export interface SchemaField {
   description?: string;
 }
 
+export interface AuthFieldConfig {
+  email_field: string;
+  username_field?: string;
+  allow_both: boolean;
+}
+
+export interface AuthConfig {
+  enabled: boolean;
+  user_collection: string;
+  login_fields: AuthFieldConfig;
+  response_fields: string[];
+  password_field: string;
+  token_expiration: number;
+  require_email_verification: boolean;
+  allow_signup: boolean;
+}
+
 export interface Schema {
   id: string;
   user_id: string;
   collection_name: string;
   fields: SchemaField[];
+  auth_config?: AuthConfig;
+  endpoint_protection?: {
+    get: boolean;
+    post: boolean;
+    put: boolean;
+    delete: boolean;
+  };
   created_at: string;
   updated_at: string;
   is_active: boolean;
@@ -22,6 +46,13 @@ export interface Schema {
 export interface CreateSchemaRequest {
   collection_name: string;
   fields: SchemaField[];
+  auth_config?: AuthConfig;
+  endpoint_protection?: {
+    get: boolean;
+    post: boolean;
+    put: boolean;
+    delete: boolean;
+  };
 }
 
 export class SchemaService {

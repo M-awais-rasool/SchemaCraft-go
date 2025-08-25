@@ -21,6 +21,14 @@ const TablesManager = () => {
   const [fields, setFields] = useState<SchemaField[]>([
     { name: 'id', type: 'string', visibility: 'public', required: true }
   ])
+  const [endpointProtection, setEndpointProtection] = useState({
+    get: false,
+    post: false,
+    put: false,
+    delete: false
+  })
+  const [availableAuthSystems, setAvailableAuthSystems] = useState<Schema[]>([])
+  const [selectedAuthSystem, setSelectedAuthSystem] = useState<string>('')
   const [schemas, setSchemas] = useState<Schema[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -34,6 +42,23 @@ const TablesManager = () => {
   useEffect(() => {
     fetchSchemas()
   }, [])
+
+  useEffect(() => {
+    if (showCreateModal) {
+      fetchAvailableAuthSystems()
+    }
+  }, [showCreateModal])
+
+  const fetchAvailableAuthSystems = async () => {
+    try {
+      const data = await SchemaService.getSchemas()
+      // Filter schemas that have authentication enabled
+      const authEnabledSchemas = data.filter(schema => schema.auth_config?.enabled)
+      setAvailableAuthSystems(authEnabledSchemas)
+    } catch (err: any) {
+      console.error('Failed to fetch auth systems:', err)
+    }
+  }
 
   const fetchSchemas = async () => {
     try {
@@ -95,7 +120,8 @@ const TablesManager = () => {
       
       await SchemaService.createSchema({
         collection_name: tableName,
-        fields: fields
+        fields: fields,
+        endpoint_protection: endpointProtection
       })
       
       // Refresh schemas list
@@ -105,6 +131,13 @@ const TablesManager = () => {
       setShowCreateModal(false)
       setTableName('')
       setFields([{ name: 'id', type: 'string', visibility: 'public', required: true }])
+      setEndpointProtection({
+        get: false,
+        post: false,
+        put: false,
+        delete: false
+      })
+      setSelectedAuthSystem('')
       
       alert(`Table "${tableName}" created successfully!`)
     } catch (err: any) {
@@ -332,41 +365,42 @@ const TablesManager = () => {
               </div>
 
               <div className="p-6 overflow-y-auto max-h-[70vh]">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Schema Builder */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Schema Builder</h3>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Table Name
-                        </label>
-                        <input
-                          type="text"
-                          value={tableName}
-                          onChange={(e) => setTableName(e.target.value)}
-                          placeholder="e.g., users, products, orders"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <label className="block text-sm font-medium text-gray-700">
-                            Fields
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Schema Builder */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Schema Builder</h3>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Table Name
                           </label>
-                          <button
-                            onClick={addField}
-                            className="text-sm text-black hover:underline"
-                          >
-                            Add Field
-                          </button>
+                          <input
+                            type="text"
+                            value={tableName}
+                            onChange={(e) => setTableName(e.target.value)}
+                            placeholder="e.g., users, products, orders"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+                          />
                         </div>
-                        
-                        <div className="space-y-3">
-                          {fields.map((field, index) => (
-                            <div key={index} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg">
+
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <label className="block text-sm font-medium text-gray-700">
+                              Fields
+                            </label>
+                            <button
+                              onClick={addField}
+                              className="text-sm text-black hover:underline"
+                            >
+                              Add Field
+                            </button>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            {fields.map((field, index) => (
+                              <div key={index} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg">
                               <input
                                 type="text"
                                 value={field.name}
@@ -415,8 +449,85 @@ const TablesManager = () => {
                     </div>
                   </div>
 
+                  {/* Endpoint Protection Configuration */}
+                  <div className="lg:col-span-2">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Endpoint Protection</h3>
+                    
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Select Authentication System (Optional)
+                        </label>
+                        <select
+                          value={selectedAuthSystem}
+                          onChange={(e) => setSelectedAuthSystem(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">No authentication required</option>
+                          {availableAuthSystems.map(authSystem => (
+                            <option key={authSystem.id} value={authSystem.id}>
+                              {authSystem.collection_name} (Auth System)
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {availableAuthSystems.length === 0 
+                            ? "Create an authentication system first in the Authentication tab"
+                            : "Select an auth system to protect endpoints"
+                          }
+                        </p>
+                      </div>
+
+                      {selectedAuthSystem && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-3">
+                            Protect Endpoints (Select which endpoints require authentication)
+                          </h4>
+                          <div className="grid grid-cols-2 gap-3">
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={endpointProtection.get}
+                                onChange={(e) => setEndpointProtection(prev => ({ ...prev, get: e.target.checked }))}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">GET (Read data)</span>
+                            </label>
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={endpointProtection.post}
+                                onChange={(e) => setEndpointProtection(prev => ({ ...prev, post: e.target.checked }))}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">POST (Create data)</span>
+                            </label>
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={endpointProtection.put}
+                                onChange={(e) => setEndpointProtection(prev => ({ ...prev, put: e.target.checked }))}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">PUT (Update data)</span>
+                            </label>
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={endpointProtection.delete}
+                                onChange={(e) => setEndpointProtection(prev => ({ ...prev, delete: e.target.checked }))}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">DELETE (Remove data)</span>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Schema Preview */}
-                  <div>
+                  <div className="lg:col-span-2">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Schema Preview</h3>
                     
                     <div className="space-y-4">
@@ -434,21 +545,30 @@ const TablesManager = () => {
                         <div className="space-y-2">
                           {tableName && (
                             <>
+                              <div className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">
+                                Data Operations {selectedAuthSystem ? '(Some endpoints protected)' : ''}
+                              </div>
+                              
+                              {/* CRUD Endpoints */}
                               <div className="flex items-center space-x-2 text-sm">
                                 <span className="bg-black text-white px-2 py-1 rounded text-xs font-mono">GET</span>
                                 <span className="font-mono text-gray-600">/api/{tableName}</span>
+                                {endpointProtection.get && <span className="text-xs text-orange-500">🔒</span>}
                               </div>
                               <div className="flex items-center space-x-2 text-sm">
                                 <span className="bg-black text-white px-2 py-1 rounded text-xs font-mono">POST</span>
                                 <span className="font-mono text-gray-600">/api/{tableName}</span>
+                                {endpointProtection.post && <span className="text-xs text-orange-500">🔒</span>}
                               </div>
                               <div className="flex items-center space-x-2 text-sm">
                                 <span className="bg-black text-white px-2 py-1 rounded text-xs font-mono">PUT</span>
                                 <span className="font-mono text-gray-600">/api/{tableName}/:id</span>
+                                {endpointProtection.put && <span className="text-xs text-orange-500">🔒</span>}
                               </div>
                               <div className="flex items-center space-x-2 text-sm">
                                 <span className="bg-black text-white px-2 py-1 rounded text-xs font-mono">DELETE</span>
                                 <span className="font-mono text-gray-600">/api/{tableName}/:id</span>
+                                {endpointProtection.delete && <span className="text-xs text-orange-500">🔒</span>}
                               </div>
                             </>
                           )}
@@ -457,6 +577,7 @@ const TablesManager = () => {
                     </div>
                   </div>
                 </div>
+              </div>
               </div>
 
               <div className="flex justify-end space-x-3 p-6 border-t border-gray-200">

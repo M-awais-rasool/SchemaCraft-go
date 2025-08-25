@@ -12,7 +12,8 @@ import {
   Notifications,
   Search,
   Person,
-  Description
+  Description,
+  Security
 } from '@mui/icons-material'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -24,6 +25,7 @@ import TablesManager from './components/TablesManager'
 import DataViewer from './components/DataViewer'
 import AccountSettings from './components/AccountSettings'
 import APIDocumentation from './components/APIDocumentation'
+import AuthManager from './components/AuthManager'
 
 const UserDashboard = () => {
   const { user, logout } = useAuth()
@@ -37,6 +39,7 @@ const UserDashboard = () => {
     { id: 'apikey', label: 'API Key', icon: Key },
     { id: 'mongodb', label: 'MongoDB Connection', icon: Storage },
     { id: 'tables', label: 'Tables', icon: TableChart },
+    { id: 'auth', label: 'Authentication', icon: Security },
     { id: 'data', label: 'Data Viewer', icon: Visibility },
     { id: 'api-docs', label: 'API Documentation', icon: Description },
     { id: 'settings', label: 'Account Settings', icon: Settings },
@@ -52,6 +55,8 @@ const UserDashboard = () => {
         return <MongoConnection />
       case 'tables':
         return <TablesManager />
+      case 'auth':
+        return <AuthManager />
       case 'data':
         return <DataViewer />
       case 'api-docs':

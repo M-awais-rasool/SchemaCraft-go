@@ -22,6 +22,7 @@ func SetupRoutes() *gin.Engine {
 	schemaController := controllers.NewSchemaController()
 	adminController := controllers.NewAdminController()
 	dynamicAPIController := controllers.NewDynamicAPIController()
+	dynamicAuthController := controllers.NewDynamicAuthController()
 
 	// Public routes
 	r.GET("/", func(c *gin.Context) {
@@ -90,12 +91,22 @@ func SetupRoutes() *gin.Engine {
 	apiGroup := r.Group("/api")
 	apiGroup.Use(middleware.APIKeyMiddleware())
 	{
-		// CRUD operations for dynamic collections
-		apiGroup.POST("/:collection", dynamicAPIController.CreateDocument)
-		apiGroup.GET("/:collection", dynamicAPIController.GetDocuments)
-		apiGroup.GET("/:collection/:id", dynamicAPIController.GetDocumentByID)
-		apiGroup.PUT("/:collection/:id", dynamicAPIController.UpdateDocument)
-		apiGroup.DELETE("/:collection/:id", dynamicAPIController.DeleteDocument)
+		// Authentication endpoints (public within API)
+		apiGroup.POST("/:collection/auth/signup", dynamicAuthController.Signup)
+		apiGroup.POST("/:collection/auth/login", dynamicAuthController.Login)
+		apiGroup.GET("/:collection/auth/validate", dynamicAuthController.ValidateToken)
+
+		// Protected dynamic API routes (apply dynamic auth middleware)
+		protectedAPIGroup := apiGroup.Group("")
+		protectedAPIGroup.Use(middleware.DynamicAuthMiddleware())
+		{
+			// CRUD operations for dynamic collections
+			protectedAPIGroup.POST("/:collection", dynamicAPIController.CreateDocument)
+			protectedAPIGroup.GET("/:collection", dynamicAPIController.GetDocuments)
+			protectedAPIGroup.GET("/:collection/:id", dynamicAPIController.GetDocumentByID)
+			protectedAPIGroup.PUT("/:collection/:id", dynamicAPIController.UpdateDocument)
+			protectedAPIGroup.DELETE("/:collection/:id", dynamicAPIController.DeleteDocument)
+		}
 	}
 
 	return r

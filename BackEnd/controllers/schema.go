@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 	"time"
 
@@ -96,15 +98,94 @@ func (sc *SchemaController) CreateSchema(c *gin.Context) {
 		}
 	}
 
+	// Validate auth configuration if provided
+	var authConfig *models.AuthConfig
+	if req.AuthConfig != nil && req.AuthConfig.Enabled {
+		// Validate auth configuration
+		if req.AuthConfig.LoginFields.EmailField == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Email field is required when authentication is enabled"})
+			return
+		}
+		if req.AuthConfig.PasswordField == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Password field is required when authentication is enabled"})
+			return
+		}
+
+		// Verify that the specified fields exist in the schema
+		emailFieldExists := false
+		passwordFieldExists := false
+		usernameFieldExists := req.AuthConfig.LoginFields.UsernameField == ""
+
+		for _, field := range req.Fields {
+			if field.Name == req.AuthConfig.LoginFields.EmailField {
+				emailFieldExists = true
+				if field.Type != "string" {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Email field must be of type 'string'"})
+					return
+				}
+			}
+			if field.Name == req.AuthConfig.PasswordField {
+				passwordFieldExists = true
+				if field.Type != "string" {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Password field must be of type 'string'"})
+					return
+				}
+			}
+			if req.AuthConfig.LoginFields.UsernameField != "" && field.Name == req.AuthConfig.LoginFields.UsernameField {
+				usernameFieldExists = true
+				if field.Type != "string" {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Username field must be of type 'string'"})
+					return
+				}
+			}
+		}
+
+		if !emailFieldExists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Email field '" + req.AuthConfig.LoginFields.EmailField + "' not found in schema"})
+			return
+		}
+		if !passwordFieldExists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Password field '" + req.AuthConfig.PasswordField + "' not found in schema"})
+			return
+		}
+		if !usernameFieldExists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Username field '" + req.AuthConfig.LoginFields.UsernameField + "' not found in schema"})
+			return
+		}
+
+		// Set defaults
+		if req.AuthConfig.TokenExpiration == 0 {
+			req.AuthConfig.TokenExpiration = 24 // 24 hours default
+		}
+		if req.AuthConfig.UserCollection == "" {
+			req.AuthConfig.UserCollection = req.CollectionName + "_users"
+		}
+
+		// Generate JWT secret if not provided
+		if req.AuthConfig.JWTSecret == "" {
+			secretBytes := make([]byte, 32)
+			_, err := rand.Read(secretBytes)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate JWT secret"})
+				return
+			}
+			req.AuthConfig.JWTSecret = hex.EncodeToString(secretBytes)
+		}
+
+		authConfig = req.AuthConfig
+	}
+
 	// Create schema
 	schema := models.Schema{
-		ID:             primitive.NewObjectID(),
-		UserID:         userID.(primitive.ObjectID),
-		CollectionName: req.CollectionName,
-		Fields:         req.Fields,
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
-		IsActive:       true,
+		ID:                 primitive.NewObjectID(),
+		UserID:             userID.(primitive.ObjectID),
+		CollectionName:     req.CollectionName,
+		Fields:             req.Fields,
+		AuthConfig:         authConfig,
+		EndpointProtection: req.EndpointProtection,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+		IsActive:           true,
 	}
 
 	// Insert schema

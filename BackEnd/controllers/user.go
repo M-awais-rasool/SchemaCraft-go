@@ -262,129 +262,299 @@ func (uc *UserController) GetAPIDocumentation(c *gin.Context) {
 		// Add schema definition
 		definitions[collectionName] = buildSchemaForCollection(schema)
 
-		// GET /api/{collection}
-		paths["/"+collectionName] = gin.H{
-			"get": gin.H{
-				"summary":     "Get all " + collectionName,
-				"description": "Retrieve all documents from the " + collectionName + " collection",
-				"tags":        []string{collectionName},
-				"parameters": []gin.H{
-					{
-						"name":        "page",
-						"in":          "query",
-						"type":        "integer",
-						"description": "Page number (default: 1)",
-					},
-					{
-						"name":        "limit",
-						"in":          "query",
-						"type":        "integer",
-						"description": "Items per page (default: 10, max: 100)",
-					},
-				},
-				"responses": gin.H{
-					"200": gin.H{"description": "Success"},
-					"401": gin.H{"description": "Unauthorized"},
-					"500": gin.H{"description": "Internal Server Error"},
-				},
-			},
-			"post": gin.H{
-				"summary":     "Create " + collectionName,
-				"description": "Create a new document in the " + collectionName + " collection",
-				"tags":        []string{collectionName},
-				"parameters": []gin.H{
-					{
-						"name":        "body",
-						"in":          "body",
-						"required":    true,
-						"description": "Document data",
-						"schema": gin.H{
-							"$ref": "#/definitions/" + collectionName,
+		// Add authentication endpoints if auth is enabled
+		if schema.AuthConfig != nil && schema.AuthConfig.Enabled {
+			// Add auth signup/login/validate endpoints
+			paths["/"+collectionName+"/auth/signup"] = gin.H{
+				"post": gin.H{
+					"summary":     "Sign up for " + collectionName,
+					"description": "Create a new user account in the " + collectionName + " authentication system",
+					"tags":        []string{collectionName + " Auth"},
+					"parameters": []gin.H{
+						{
+							"name":        "body",
+							"in":          "body",
+							"required":    true,
+							"description": "User signup data",
+							"schema": gin.H{
+								"type": "object",
+								"properties": gin.H{
+									"data": gin.H{
+										"type":        "object",
+										"description": "User data according to your schema",
+										"properties":  buildAuthSchemaProperties(schema),
+									},
+								},
+								"required": []string{"data"},
+							},
 						},
 					},
+					"responses": gin.H{
+						"201": gin.H{
+							"description": "User created successfully",
+							"schema": gin.H{
+								"$ref": "#/definitions/AuthResponse",
+							},
+						},
+						"400": gin.H{"description": "Bad Request"},
+						"409": gin.H{"description": "User already exists"},
+						"500": gin.H{"description": "Internal Server Error"},
+					},
 				},
-				"responses": gin.H{
-					"201": gin.H{"description": "Created"},
-					"400": gin.H{"description": "Bad Request"},
-					"401": gin.H{"description": "Unauthorized"},
-					"500": gin.H{"description": "Internal Server Error"},
+			}
+
+			paths["/"+collectionName+"/auth/login"] = gin.H{
+				"post": gin.H{
+					"summary":     "Login to " + collectionName,
+					"description": "Authenticate user and get access token",
+					"tags":        []string{collectionName + " Auth"},
+					"parameters": []gin.H{
+						{
+							"name":        "body",
+							"in":          "body",
+							"required":    true,
+							"description": "Login credentials",
+							"schema": gin.H{
+								"$ref": "#/definitions/LoginRequest",
+							},
+						},
+					},
+					"responses": gin.H{
+						"200": gin.H{
+							"description": "Login successful",
+							"schema": gin.H{
+								"$ref": "#/definitions/AuthResponse",
+							},
+						},
+						"401": gin.H{"description": "Invalid credentials"},
+						"500": gin.H{"description": "Internal Server Error"},
+					},
 				},
+			}
+
+			paths["/"+collectionName+"/auth/validate"] = gin.H{
+				"get": gin.H{
+					"summary":     "Validate token for " + collectionName,
+					"description": "Validate authentication token",
+					"tags":        []string{collectionName + " Auth"},
+					"security": []gin.H{
+						{"BearerAuth": []string{}},
+					},
+					"responses": gin.H{
+						"200": gin.H{
+							"description": "Token is valid",
+							"schema": gin.H{
+								"type": "object",
+								"properties": gin.H{
+									"valid":      gin.H{"type": "boolean"},
+									"user_id":    gin.H{"type": "string"},
+									"collection": gin.H{"type": "string"},
+									"expires_at": gin.H{"type": "string", "format": "date-time"},
+								},
+							},
+						},
+						"401": gin.H{"description": "Invalid token"},
+					},
+				},
+			}
+
+			// Update security definitions to include Bearer auth
+			securityDefs := apiDoc["securityDefinitions"].(gin.H)
+			securityDefs["BearerAuth"] = gin.H{
+				"type":        "apiKey",
+				"name":        "Authorization",
+				"in":          "header",
+				"description": "Bearer token for authenticated requests. Format: Bearer {token}",
+			}
+		}
+
+		// GET /api/{collection}
+		getEndpoint := gin.H{
+			"summary":     "Get all " + collectionName,
+			"description": "Retrieve all documents from the " + collectionName + " collection",
+			"tags":        []string{collectionName},
+			"parameters": []gin.H{
+				{
+					"name":        "page",
+					"in":          "query",
+					"type":        "integer",
+					"description": "Page number (default: 1)",
+				},
+				{
+					"name":        "limit",
+					"in":          "query",
+					"type":        "integer",
+					"description": "Items per page (default: 10, max: 100)",
+				},
+			},
+			"responses": gin.H{
+				"200": gin.H{"description": "Success"},
+				"401": gin.H{"description": "Unauthorized"},
+				"500": gin.H{"description": "Internal Server Error"},
 			},
 		}
 
-		// GET/PUT/DELETE /api/{collection}/{id}
-		paths["/"+collectionName+"/{id}"] = gin.H{
-			"get": gin.H{
-				"summary":     "Get " + collectionName + " by ID",
-				"description": "Retrieve a specific document by ID",
-				"tags":        []string{collectionName},
-				"parameters": []gin.H{
-					{
-						"name":        "id",
-						"in":          "path",
-						"required":    true,
-						"type":        "string",
-						"description": "Document ID",
+		postEndpoint := gin.H{
+			"summary":     "Create " + collectionName,
+			"description": "Create a new document in the " + collectionName + " collection",
+			"tags":        []string{collectionName},
+			"parameters": []gin.H{
+				{
+					"name":        "body",
+					"in":          "body",
+					"required":    true,
+					"description": "Document data",
+					"schema": gin.H{
+						"$ref": "#/definitions/" + collectionName,
 					},
-				},
-				"responses": gin.H{
-					"200": gin.H{"description": "Success"},
-					"401": gin.H{"description": "Unauthorized"},
-					"404": gin.H{"description": "Not Found"},
-					"500": gin.H{"description": "Internal Server Error"},
 				},
 			},
-			"put": gin.H{
-				"summary":     "Update " + collectionName,
-				"description": "Update a specific document by ID",
-				"tags":        []string{collectionName},
-				"parameters": []gin.H{
-					{
-						"name":        "id",
-						"in":          "path",
-						"required":    true,
-						"type":        "string",
-						"description": "Document ID",
-					},
-					{
-						"name":        "body",
-						"in":          "body",
-						"required":    true,
-						"description": "Update data",
-						"schema": gin.H{
-							"$ref": "#/definitions/" + collectionName,
-						},
-					},
-				},
-				"responses": gin.H{
-					"200": gin.H{"description": "Success"},
-					"400": gin.H{"description": "Bad Request"},
-					"401": gin.H{"description": "Unauthorized"},
-					"404": gin.H{"description": "Not Found"},
-					"500": gin.H{"description": "Internal Server Error"},
-				},
-			},
-			"delete": gin.H{
-				"summary":     "Delete " + collectionName,
-				"description": "Delete a specific document by ID",
-				"tags":        []string{collectionName},
-				"parameters": []gin.H{
-					{
-						"name":        "id",
-						"in":          "path",
-						"required":    true,
-						"type":        "string",
-						"description": "Document ID",
-					},
-				},
-				"responses": gin.H{
-					"200": gin.H{"description": "Success"},
-					"401": gin.H{"description": "Unauthorized"},
-					"404": gin.H{"description": "Not Found"},
-					"500": gin.H{"description": "Internal Server Error"},
-				},
+			"responses": gin.H{
+				"201": gin.H{"description": "Created"},
+				"400": gin.H{"description": "Bad Request"},
+				"401": gin.H{"description": "Unauthorized"},
+				"500": gin.H{"description": "Internal Server Error"},
 			},
 		}
+
+		// Add authentication requirement if endpoint is protected
+		if schema.EndpointProtection != nil && schema.EndpointProtection.Get {
+			getEndpoint["security"] = []gin.H{{"BearerAuth": []string{}}}
+		}
+		if schema.EndpointProtection != nil && schema.EndpointProtection.Post {
+			postEndpoint["security"] = []gin.H{{"BearerAuth": []string{}}}
+		}
+
+		paths["/"+collectionName] = gin.H{
+			"get":  getEndpoint,
+			"post": postEndpoint,
+		}
+
+		// GET/PUT/DELETE /api/{collection}/{id}
+		getByIdEndpoint := gin.H{
+			"summary":     "Get " + collectionName + " by ID",
+			"description": "Retrieve a specific document by ID",
+			"tags":        []string{collectionName},
+			"parameters": []gin.H{
+				{
+					"name":        "id",
+					"in":          "path",
+					"required":    true,
+					"type":        "string",
+					"description": "Document ID",
+				},
+			},
+			"responses": gin.H{
+				"200": gin.H{"description": "Success"},
+				"401": gin.H{"description": "Unauthorized"},
+				"404": gin.H{"description": "Not Found"},
+				"500": gin.H{"description": "Internal Server Error"},
+			},
+		}
+
+		putEndpoint := gin.H{
+			"summary":     "Update " + collectionName,
+			"description": "Update a specific document by ID",
+			"tags":        []string{collectionName},
+			"parameters": []gin.H{
+				{
+					"name":        "id",
+					"in":          "path",
+					"required":    true,
+					"type":        "string",
+					"description": "Document ID",
+				},
+				{
+					"name":        "body",
+					"in":          "body",
+					"required":    true,
+					"description": "Update data",
+					"schema": gin.H{
+						"$ref": "#/definitions/" + collectionName,
+					},
+				},
+			},
+			"responses": gin.H{
+				"200": gin.H{"description": "Success"},
+				"400": gin.H{"description": "Bad Request"},
+				"401": gin.H{"description": "Unauthorized"},
+				"404": gin.H{"description": "Not Found"},
+				"500": gin.H{"description": "Internal Server Error"},
+			},
+		}
+
+		deleteEndpoint := gin.H{
+			"summary":     "Delete " + collectionName,
+			"description": "Delete a specific document by ID",
+			"tags":        []string{collectionName},
+			"parameters": []gin.H{
+				{
+					"name":        "id",
+					"in":          "path",
+					"required":    true,
+					"type":        "string",
+					"description": "Document ID",
+				},
+			},
+			"responses": gin.H{
+				"200": gin.H{"description": "Success"},
+				"401": gin.H{"description": "Unauthorized"},
+				"404": gin.H{"description": "Not Found"},
+				"500": gin.H{"description": "Internal Server Error"},
+			},
+		}
+
+		// Add authentication requirement if endpoint is protected
+		if schema.EndpointProtection != nil && schema.EndpointProtection.Get {
+			getByIdEndpoint["security"] = []gin.H{{"BearerAuth": []string{}}}
+		}
+		if schema.EndpointProtection != nil && schema.EndpointProtection.Put {
+			putEndpoint["security"] = []gin.H{{"BearerAuth": []string{}}}
+		}
+		if schema.EndpointProtection != nil && schema.EndpointProtection.Delete {
+			deleteEndpoint["security"] = []gin.H{{"BearerAuth": []string{}}}
+		}
+
+		paths["/"+collectionName+"/{id}"] = gin.H{
+			"get":    getByIdEndpoint,
+			"put":    putEndpoint,
+			"delete": deleteEndpoint,
+		}
+	}
+
+	// Add common authentication definitions
+	definitions["LoginRequest"] = gin.H{
+		"type": "object",
+		"properties": gin.H{
+			"identifier": gin.H{
+				"type":        "string",
+				"description": "Email or username",
+			},
+			"password": gin.H{
+				"type":        "string",
+				"description": "Password",
+			},
+		},
+		"required": []string{"identifier", "password"},
+	}
+
+	definitions["AuthResponse"] = gin.H{
+		"type": "object",
+		"properties": gin.H{
+			"token": gin.H{
+				"type":        "string",
+				"description": "JWT access token",
+			},
+			"user": gin.H{
+				"type":        "object",
+				"description": "User data",
+			},
+			"expires_at": gin.H{
+				"type":        "string",
+				"format":      "date-time",
+				"description": "Token expiration time",
+			},
+		},
 	}
 
 	apiDoc["paths"] = paths
@@ -425,6 +595,56 @@ func buildSchemaForCollection(schema models.Schema) gin.H {
 	}
 
 	return schemaDefinition
+}
+
+// Helper function to build auth schema properties
+func buildAuthSchemaProperties(schema models.Schema) gin.H {
+	properties := gin.H{}
+
+	if schema.AuthConfig != nil {
+		// Add common auth fields
+		emailField := schema.AuthConfig.LoginFields.EmailField
+		if emailField != "" {
+			properties[emailField] = gin.H{
+				"type":        "string",
+				"format":      "email",
+				"description": "Email address",
+			}
+		}
+
+		usernameField := schema.AuthConfig.LoginFields.UsernameField
+		if usernameField != "" {
+			properties[usernameField] = gin.H{
+				"type":        "string",
+				"description": "Username",
+			}
+		}
+
+		passwordField := schema.AuthConfig.PasswordField
+		if passwordField != "" {
+			properties[passwordField] = gin.H{
+				"type":        "string",
+				"format":      "password",
+				"description": "Password",
+			}
+		}
+
+		// Add other schema fields
+		for _, field := range schema.Fields {
+			if field.Name != passwordField && field.Name != emailField && field.Name != usernameField {
+				fieldSchema := gin.H{
+					"type":        field.Type,
+					"description": field.Description,
+				}
+				if field.Default != nil {
+					fieldSchema["default"] = field.Default
+				}
+				properties[field.Name] = fieldSchema
+			}
+		}
+	}
+
+	return properties
 }
 
 // @Summary Get user Swagger UI
