@@ -66,14 +66,54 @@ func APIKeyMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Update API usage stats
+		// Check if user has exceeded their quota
+		if user.APIUsage.UsedThisMonth >= user.APIUsage.MonthlyQuota {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":   "API quota exceeded",
+				"message": "You have reached your monthly API quota limit. Please upgrade your plan or wait until next month for quota reset.",
+				"quota_info": gin.H{
+					"used":  user.APIUsage.UsedThisMonth,
+					"limit": user.APIUsage.MonthlyQuota,
+				},
+			})
+			c.Abort()
+			return
+		}
+
+		// Update API usage stats and check for notifications
 		go func() {
 			filter := bson.M{"_id": user.ID}
 			update := bson.M{
 				"$inc": bson.M{"api_usage.total_requests": 1, "api_usage.used_this_month": 1},
 				"$set": bson.M{"api_usage.last_request": time.Now()},
 			}
-			config.DB.Collection("users").UpdateOne(context.TODO(), filter, update)
+			result, err := config.DB.Collection("users").UpdateOne(context.TODO(), filter, update)
+			if err != nil {
+				return
+			}
+
+			// If update was successful, check for notifications
+			if result.ModifiedCount > 0 {
+				// Get updated user data to check new usage
+				var updatedUser models.User
+				err := config.DB.Collection("users").FindOne(context.TODO(), bson.M{"_id": user.ID}).Decode(&updatedUser)
+				if err != nil {
+					return
+				}
+
+				// Check and create API usage notifications
+				notificationService := utils.NewNotificationService()
+				err = notificationService.CheckAndCreateAPIUsageNotifications(
+					updatedUser.ID,
+					updatedUser.Name,
+					updatedUser.APIUsage.UsedThisMonth,
+					updatedUser.APIUsage.MonthlyQuota,
+				)
+				if err != nil {
+					// Log error but don't fail the request
+					return
+				}
+			}
 		}()
 
 		// Store user info in context

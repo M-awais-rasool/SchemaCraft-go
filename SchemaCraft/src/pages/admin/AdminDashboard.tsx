@@ -10,7 +10,8 @@ import {
   Search,
   Notifications,
   Menu,
-  Close
+  Close,
+  Assessment
 } from '@mui/icons-material'
 
 // Import dashboard components
@@ -19,6 +20,7 @@ import UserManagement from './components/UserManagement'
 import DatabaseManagement from './components/DatabaseManagement'
 import PaymentsSubscriptions from './components/PaymentsSubscriptions'
 import AdminSettings from './components/AdminSettings'
+import APIUsageManagement from './components/APIUsageManagement'
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -30,6 +32,7 @@ const AdminDashboard = () => {
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
     { id: 'users', label: 'Users Management', icon: People },
+    { id: 'api-usage', label: 'API Usage', icon: Assessment },
     { id: 'swagger', label: 'Swagger Schema', icon: Description },
     { id: 'payments', label: 'Payments & Subscriptions', icon: Payment },
     { id: 'settings', label: 'Settings', icon: Settings },
@@ -48,6 +51,8 @@ const AdminDashboard = () => {
         return <DashboardOverview />
       case 'users':
         return <UserManagement />
+      case 'api-usage':
+        return <APIUsageManagement />
       case 'database':
         return <DatabaseManagement />
       case 'swagger':

@@ -23,6 +23,7 @@ func SetupRoutes() *gin.Engine {
 	adminController := controllers.NewAdminController()
 	dynamicAPIController := controllers.NewDynamicAPIController()
 	dynamicAuthController := controllers.NewDynamicAuthController()
+	notificationController := controllers.NewNotificationController()
 
 	// Public routes
 	r.GET("/", func(c *gin.Context) {
@@ -60,6 +61,14 @@ func SetupRoutes() *gin.Engine {
 		// Auth routes (protected)
 		protectedGroup.GET("/auth/me", authController.GetCurrentUser)
 		protectedGroup.PUT("/auth/mongodb-uri", authController.UpdateMongoURI)
+		protectedGroup.POST("/auth/test-mongodb", authController.TestMongoConnection)
+
+		// Notification routes
+		protectedGroup.GET("/notifications", notificationController.GetNotifications)
+		protectedGroup.PUT("/notifications/:id/read", notificationController.MarkAsRead)
+		protectedGroup.PUT("/notifications/read-all", notificationController.MarkAllAsRead)
+		protectedGroup.DELETE("/notifications/:id", notificationController.DeleteNotification)
+		protectedGroup.GET("/notifications/unread-count", notificationController.GetUnreadCount)
 
 		// User dashboard routes
 		protectedGroup.GET("/user/dashboard", userController.GetDashboard)
@@ -84,7 +93,9 @@ func SetupRoutes() *gin.Engine {
 		adminGroup.GET("/users/:id", adminController.GetUserByID)
 		adminGroup.PUT("/users/:id/toggle-status", adminController.ToggleUserStatus)
 		adminGroup.POST("/users/:id/revoke-api-key", adminController.RevokeAPIKey)
+		adminGroup.POST("/users/:id/reset-quota", adminController.ResetUserQuota)
 		adminGroup.GET("/stats", adminController.GetPlatformStats)
+		adminGroup.GET("/api-usage", adminController.GetAPIUsageStats)
 	}
 
 	// Dynamic API routes (require API Key)

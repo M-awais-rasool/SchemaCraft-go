@@ -13,7 +13,8 @@ import {
   AdminPanelSettings,
   Refresh,
   Error,
-  Key
+  Key,
+  RestartAlt
 } from '@mui/icons-material'
 import AdminService from '../../../services/adminService'
 import type { User } from '../../../types/auth'
@@ -87,6 +88,25 @@ const UserManagement = () => {
       alert(err.response?.data?.error || 'Failed to revoke API key')
     } finally {
       setActionLoading(prev => ({ ...prev, [`revoke-${userId}`]: false }))
+    }
+  }
+
+  const handleResetUserQuota = async (userId: string) => {
+    if (!confirm('Are you sure you want to reset this user\'s API quota? This will reset their monthly usage to 0.')) {
+      return
+    }
+
+    try {
+      setActionLoading(prev => ({ ...prev, [`reset-${userId}`]: true }))
+      await AdminService.resetUserQuota(userId)
+      // Refresh the user list
+      await fetchUsers()
+      alert('User quota reset successfully')
+    } catch (err: any) {
+      console.error('Failed to reset user quota:', err)
+      alert(err.response?.data?.error || 'Failed to reset user quota')
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`reset-${userId}`]: false }))
     }
   }
 
@@ -305,6 +325,14 @@ const UserManagement = () => {
                           <Key className="w-4 h-4 text-gray-400 hover:text-black" />
                         </button>
                       )}
+                      <button 
+                        onClick={() => handleResetUserQuota(user.id)}
+                        disabled={actionLoading[`reset-${user.id}`]}
+                        className="p-1 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                        title="Reset API quota"
+                      >
+                        <RestartAlt className="w-4 h-4 text-gray-400 hover:text-orange-500" />
+                      </button>
                       <button className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
                         <Edit className="w-4 h-4 text-gray-400 hover:text-black" />
                       </button>

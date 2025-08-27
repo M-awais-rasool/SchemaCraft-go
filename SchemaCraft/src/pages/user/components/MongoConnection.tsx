@@ -11,6 +11,7 @@ import {
   Info
 } from '@mui/icons-material'
 import { AuthService } from '../../../services/authService'
+import NotificationService from '../../../services/notificationService'
 import { useAuth } from '../../../contexts/AuthContext'
 
 const MongoConnection = () => {
@@ -45,10 +46,16 @@ const MongoConnection = () => {
     setError(null)
     
     try {
-      // Actually test the connection by calling the backend
-      await AuthService.updateMongoURI(mongoUri, databaseName)
-      setConnectionStatus('connected')
-      setError(null)
+      // Test the connection using the new test endpoint
+      const result = await NotificationService.testMongoConnection(mongoUri, databaseName)
+      
+      if (result.connected) {
+        setConnectionStatus('connected')
+        setError(null)
+      } else {
+        setConnectionStatus('error')
+        setError(result.error || 'Connection failed')
+      }
     } catch (err: any) {
       console.error('MongoDB connection test failed:', err)
       setConnectionStatus('error')
@@ -68,13 +75,16 @@ const MongoConnection = () => {
       setIsSaving(true)
       setError(null)
       
-      // Connection is already tested and saved during test, just update user context
+      // Save the MongoDB URI using the original endpoint
+      await AuthService.updateMongoURI(mongoUri, databaseName)
+      
+      // Update user context
       await updateUser()
       
       alert('MongoDB connection saved successfully!')
     } catch (err: any) {
-      console.error('Failed to update user context:', err)
-      setError('Failed to update user information')
+      console.error('Failed to save MongoDB connection:', err)
+      setError('Failed to save MongoDB connection')
     } finally {
       setIsSaving(false)
     }

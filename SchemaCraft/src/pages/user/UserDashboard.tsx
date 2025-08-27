@@ -10,7 +10,6 @@ import {
   Menu,
   Close,
   Notifications,
-  Search,
   Person,
   Description,
   Security
@@ -26,6 +25,9 @@ import DataViewer from './components/DataViewer'
 import AccountSettings from './components/AccountSettings'
 import APIDocumentation from './components/APIDocumentation'
 import AuthManager from './components/AuthManager'
+import NotificationsList from './components/NotificationsList'
+import NotificationDropdown from '../../components/NotificationDropdown'
+import NotificationService from '../../services/notificationService'
 
 const UserDashboard = () => {
   const { user, logout } = useAuth()
@@ -33,6 +35,8 @@ const UserDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
+  const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
@@ -42,6 +46,7 @@ const UserDashboard = () => {
     { id: 'auth', label: 'Authentication', icon: Security },
     { id: 'data', label: 'Data Viewer', icon: Visibility },
     { id: 'api-docs', label: 'API Documentation', icon: Description },
+    { id: 'notifications', label: 'Notifications', icon: Notifications },
     { id: 'settings', label: 'Account Settings', icon: Settings },
   ]
 
@@ -61,12 +66,31 @@ const UserDashboard = () => {
         return <DataViewer />
       case 'api-docs':
         return <APIDocumentation />
+      case 'notifications':
+        return <NotificationsList />
       case 'settings':
         return <AccountSettings />
       default:
         return <UserOverview />
     }
   }
+
+  // Fetch unread notification count
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await NotificationService.getUnreadCount()
+      setUnreadCount(response.unread_count)
+    } catch (error) {
+      console.error('Failed to fetch unread count:', error)
+    }
+  }
+
+  useEffect(() => {
+    fetchUnreadCount()
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Close mobile menu when screen size changes
   useEffect(() => {
@@ -187,23 +211,30 @@ const UserDashboard = () => {
 
             {/* Search Bar */}
             <div className="relative hidden md:block">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent w-80"
-              />
             </div>
           </div>
 
           <div className="flex items-center space-x-4">
             {/* Notifications */}
-            <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative">
-              <Notifications className="w-5 h-5 text-black" />
-              <span className="absolute -top-1 -right-1 bg-black text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                3
-              </span>
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setNotificationDropdownOpen(!notificationDropdownOpen)}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
+              >
+                <Notifications className="w-5 h-5 text-black" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              <NotificationDropdown 
+                isOpen={notificationDropdownOpen}
+                onClose={() => setNotificationDropdownOpen(false)}
+                onNotificationUpdate={fetchUnreadCount}
+              />
+            </div>
 
             {/* Profile Dropdown */}
             <div className="relative">

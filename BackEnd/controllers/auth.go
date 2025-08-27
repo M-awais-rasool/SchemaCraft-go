@@ -214,9 +214,31 @@ func (ac *AuthController) UpdateMongoURI(c *gin.Context) {
 		return
 	}
 
-	// Test connection to the provided MongoDB URI
-	err := config.TestMongoConnection(req.MongoDBURI, req.DatabaseName)
+	// Get user information for notification
+	var user models.User
+	err := config.DB.Collection("users").FindOne(context.TODO(), bson.M{"_id": userID}).Decode(&user)
 	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Initialize notification service
+	notificationService := utils.NewNotificationService()
+
+	// Test connection to the provided MongoDB URI
+	err = config.TestMongoConnection(req.MongoDBURI, req.DatabaseName)
+	if err != nil {
+		// Create notification for failed connection
+		notificationErr := notificationService.CreateMongoConnectionErrorNotification(
+			userID.(primitive.ObjectID),
+			user.Name,
+			err.Error(),
+		)
+		if notificationErr != nil {
+			// Log the notification error but don't fail the request
+			fmt.Printf("Failed to create notification: %v\n", notificationErr)
+		}
+
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to connect to MongoDB: " + err.Error()})
 		return
 	}
@@ -236,7 +258,81 @@ func (ac *AuthController) UpdateMongoURI(c *gin.Context) {
 		return
 	}
 
+	// Create notification for successful connection
+	notificationErr := notificationService.CreateMongoConnectionSuccessNotification(
+		userID.(primitive.ObjectID),
+		user.Name,
+		req.DatabaseName,
+	)
+	if notificationErr != nil {
+		// Log the notification error but don't fail the request
+		fmt.Printf("Failed to create success notification: %v\n", notificationErr)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "MongoDB URI updated successfully"})
+}
+
+// @Summary Test MongoDB connection
+// @Description Test MongoDB connection without saving the URI
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body models.UpdateMongoURIRequest true "MongoDB URI data"
+// @Success 200 "Success"
+// @Failure 400 "Bad Request"
+// @Failure 401 "Unauthorized"
+// @Failure 500 "Internal Server Error"
+// @Router /auth/test-mongodb [post]
+func (ac *AuthController) TestMongoConnection(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req models.UpdateMongoURIRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user information for notification
+	var user models.User
+	err := config.DB.Collection("users").FindOne(context.TODO(), bson.M{"_id": userID}).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Initialize notification service
+	notificationService := utils.NewNotificationService()
+
+	// Test connection to the provided MongoDB URI
+	err = config.TestMongoConnection(req.MongoDBURI, req.DatabaseName)
+	if err != nil {
+		// Create notification for failed connection
+		notificationErr := notificationService.CreateMongoConnectionErrorNotification(
+			userID.(primitive.ObjectID),
+			user.Name,
+			err.Error(),
+		)
+		if notificationErr != nil {
+			// Log the notification error but don't fail the request
+			fmt.Printf("Failed to create notification: %v\n", notificationErr)
+		}
+
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":     "Failed to connect to MongoDB: " + err.Error(),
+			"connected": false,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "MongoDB connection successful",
+		"connected": true,
+	})
 }
 
 // GoogleUser represents the user data from Google

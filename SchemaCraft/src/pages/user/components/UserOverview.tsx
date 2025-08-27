@@ -11,10 +11,9 @@ import {
   Timeline
 } from '@mui/icons-material'
 import { UserService, type DashboardData } from '../../../services/userService'
-import { useAuth } from '../../../contexts/AuthContext'
+import QuotaStatus from '../../../components/QuotaStatus'
 
 const UserOverview = () => {
-  const { user } = useAuth()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
