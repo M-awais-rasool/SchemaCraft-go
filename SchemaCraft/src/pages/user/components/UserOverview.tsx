@@ -11,7 +11,6 @@ import {
   Timeline
 } from '@mui/icons-material'
 import { UserService, type DashboardData } from '../../../services/userService'
-import QuotaStatus from '../../../components/QuotaStatus'
 
 const UserOverview = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
