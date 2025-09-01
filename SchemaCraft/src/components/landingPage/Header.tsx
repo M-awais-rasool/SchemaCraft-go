@@ -1,8 +1,9 @@
-import { Database, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
+import { Dashboard } from "@mui/icons-material";
 
 // Smooth scroll utility function
 const smoothScrollToSection = (sectionId: string, offset: number = 80) => {
@@ -22,7 +23,7 @@ export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <motion.header 
+    <motion.header
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
@@ -31,7 +32,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
@@ -41,19 +42,20 @@ export function Header() {
               whileHover={{ rotate: 360, scale: 1.1 }}
               transition={{ duration: 0.6, ease: "easeInOut" }}
             >
-              <Database className="h-8 w-8 text-primary mr-2" />
+              <Dashboard className="w-6 h-6 text-black m-2" />
             </motion.div>
-            <motion.h1 
-              className="text-2xl font-bold text-primary"
-              whileHover={{ scale: 1.05 }}
-              transition={{ duration: 0.2 }}
+            <motion.div
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: 'auto' }}
+              exit={{ opacity: 0, width: 0 }}
+              className="overflow-hidden"
             >
-              DataForge
-            </motion.h1>
+              <h1 className="text-xl font-bold">SchemaCraft</h1>
+            </motion.div>
           </motion.div>
 
           {/* Desktop Navigation */}
-          <motion.nav 
+          <motion.nav
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.5 }}
@@ -92,7 +94,7 @@ export function Header() {
           </motion.nav>
 
           {/* Auth Buttons */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.5, duration: 0.5 }}
@@ -102,16 +104,16 @@ export function Header() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className="hidden sm:inline-flex"
-                >
-                  <Link to="/login">
-                    Login
-                  </Link>
-                </Button>
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="hidden sm:inline-flex"
+              >
+                <Link to="/login">
+                  Login
+                </Link>
+              </Button>
             </motion.div>
             <motion.div
               whileHover={{ scale: 1.05 }}
@@ -161,14 +163,14 @@ export function Header() {
         {/* Mobile Navigation */}
         <AnimatePresence>
           {isMenuOpen && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.3, ease: "easeInOut" }}
               className="md:hidden border-t border-border/50 overflow-hidden"
             >
-              <motion.nav 
+              <motion.nav
                 initial={{ y: -20 }}
                 animate={{ y: 0 }}
                 transition={{ delay: 0.1, duration: 0.3 }}
@@ -200,7 +202,7 @@ export function Header() {
                     {item.label}
                   </motion.button>
                 ))}
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.6, duration: 0.3 }}

@@ -9,10 +9,8 @@ import {
   Database,
   Shield,
   Zap, 
-  Globe
 } from "lucide-react";
 
-// Smooth scroll utility function
 const smoothScrollToSection = (sectionId: string, offset: number = 80) => {
   const element = document.getElementById(sectionId);
   if (element) {
@@ -29,10 +27,8 @@ const smoothScrollToSection = (sectionId: string, offset: number = 80) => {
 export function Footer() {
   return (
     <footer className="bg-primary text-primary-foreground">
-      {/* Main Footer Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* Company Info */}
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Database className="h-8 w-8" />
@@ -161,11 +157,7 @@ export function Footer() {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <Mail className="h-4 w-4 text-primary-foreground/60" />
-                <span className="text-primary-foreground/80">hello@dataforge.dev</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Globe className="h-4 w-4 text-primary-foreground/60" />
-                <span className="text-primary-foreground/80">San Francisco, CA</span>
+                <span className="text-primary-foreground/80">ar30781871@gmail.com</span>
               </div>
             </div>
           </div>
