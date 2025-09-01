@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -66,6 +67,23 @@ func APIKeyMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// Check and reset monthly quota if necessary
+		quotaReset, err := utils.CheckAndResetMonthlyQuota(user.ID, &user.APIUsage)
+		if err != nil {
+			// Log error but continue - don't fail the request due to quota reset issues
+			fmt.Printf("Error checking/resetting quota for user %s: %v\n", user.ID.Hex(), err)
+		}
+
+		// If quota was reset, fetch updated user data
+		if quotaReset {
+			err = config.DB.Collection("users").FindOne(context.TODO(), bson.M{"_id": user.ID}).Decode(&user)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch updated user data"})
+				c.Abort()
+				return
+			}
+		}
+
 		// Check if user has exceeded their quota
 		if user.APIUsage.UsedThisMonth >= user.APIUsage.MonthlyQuota {
 			c.JSON(http.StatusTooManyRequests, gin.H{
@@ -78,9 +96,7 @@ func APIKeyMiddleware() gin.HandlerFunc {
 			})
 			c.Abort()
 			return
-		}
-
-		// Update API usage stats and check for notifications
+		} // Update API usage stats and check for notifications
 		go func() {
 			filter := bson.M{"_id": user.ID}
 			update := bson.M{

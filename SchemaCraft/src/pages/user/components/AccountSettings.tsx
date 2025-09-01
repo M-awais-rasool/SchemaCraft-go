@@ -12,9 +12,7 @@ import {
   Warning
 } from '@mui/icons-material'
 import { useAuth } from '../../../contexts/AuthContext'
-import { UserService } from '../../../services/userService'
-import { AuthService } from '../../../services/authService'
-
+ 
 const AccountSettings = () => {
   const { user, updateUser } = useAuth()
   const [activeTab, setActiveTab] = useState('profile')

@@ -69,6 +69,9 @@ func (ac *AuthController) Signup(c *gin.Context) {
 	}
 
 	// Create user
+	now := time.Now()
+	nextMonthStart := utils.GetNextMonthStart(now)
+
 	user := models.User{
 		ID:        primitive.NewObjectID(),
 		Name:      req.Name,
@@ -77,10 +80,12 @@ func (ac *AuthController) Signup(c *gin.Context) {
 		APIKey:    apiKey,
 		IsAdmin:   false,
 		IsActive:  true,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		CreatedAt: now,
+		UpdatedAt: now,
 		APIUsage: models.APIUsageStats{
-			MonthlyQuota: 1000, // Default quota
+			MonthlyQuota:  1000, // Default quota
+			UsedThisMonth: 0,
+			QuotaResetAt:  nextMonthStart,
 		},
 	}
 
@@ -430,6 +435,9 @@ func (ac *AuthController) GoogleAuth(c *gin.Context) {
 		return
 	}
 
+	now := time.Now()
+	nextMonthStart := utils.GetNextMonthStart(now)
+
 	newUser := models.User{
 		ID:        primitive.NewObjectID(),
 		Name:      googleUser.Name,
@@ -438,10 +446,12 @@ func (ac *AuthController) GoogleAuth(c *gin.Context) {
 		APIKey:    apiKey,
 		IsAdmin:   false,
 		IsActive:  true,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		CreatedAt: now,
+		UpdatedAt: now,
 		APIUsage: models.APIUsageStats{
-			MonthlyQuota: 1000, // Default quota
+			MonthlyQuota:  1000, // Default quota
+			UsedThisMonth: 0,
+			QuotaResetAt:  nextMonthStart,
 		},
 	}
 

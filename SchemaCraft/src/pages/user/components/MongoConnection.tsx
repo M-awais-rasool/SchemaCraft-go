@@ -23,7 +23,7 @@ const MongoConnection = () => {
   const [isSaving, setIsSaving] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
-
+ 
   // Initialize form with existing user data
   useEffect(() => {
     if (user?.mongodb_uri) {

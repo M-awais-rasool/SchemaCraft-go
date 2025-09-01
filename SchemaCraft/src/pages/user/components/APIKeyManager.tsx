@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState } from 'react'
+import { motion } from 'framer-motion'
 import {
   Key,
   Visibility,
@@ -12,7 +12,7 @@ import {
 } from '@mui/icons-material'
 import { UserService } from '../../../services/userService'
 import { useAuth } from '../../../contexts/AuthContext'
-
+ 
 const APIKeyManager = () => {
   const { user, updateUser } = useAuth()
   const [showKey, setShowKey] = useState(false)

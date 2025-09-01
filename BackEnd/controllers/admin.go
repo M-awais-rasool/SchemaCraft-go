@@ -4,9 +4,11 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"time"
 
 	"schemacraft-backend/config"
 	"schemacraft-backend/models"
+	"schemacraft-backend/utils"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -392,11 +394,13 @@ func (ac *AdminController) ResetUserQuota(c *gin.Context) {
 		return
 	}
 
-	// Reset user's monthly usage to 0
+	// Reset user's monthly usage to 0 and set new quota reset time
+	nextReset := utils.GetNextMonthStart(time.Now())
 	filter := bson.M{"_id": userID}
 	update := bson.M{
 		"$set": bson.M{
 			"api_usage.used_this_month": 0,
+			"api_usage.quota_reset_at":  nextReset,
 		},
 	}
 
@@ -413,5 +417,49 @@ func (ac *AdminController) ResetUserQuota(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "User quota reset successfully",
+	})
+}
+
+// @Summary Migrate existing users quota system (Admin only)
+// @Description Add quota_reset_at field to existing users who don't have it
+// @Tags admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 403 "Forbidden"
+// @Failure 500 "Internal Server Error"
+// @Router /admin/migrate-quota-system [post]
+func (ac *AdminController) MigrateQuotaSystem(c *gin.Context) {
+	err := utils.MigrateExistingUsersQuotaReset()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Migration failed: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Quota system migration completed successfully",
+	})
+}
+
+// @Summary Reset all users quota (Admin only)
+// @Description Reset monthly quota for all users (useful for testing or manual reset)
+// @Tags admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 403 "Forbidden"
+// @Failure 500 "Internal Server Error"
+// @Router /admin/reset-all-quota [post]
+func (ac *AdminController) ResetAllUsersQuota(c *gin.Context) {
+	err := utils.ResetAllUsersQuota()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset all quotas: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "All users' quota reset successfully",
 	})
 }

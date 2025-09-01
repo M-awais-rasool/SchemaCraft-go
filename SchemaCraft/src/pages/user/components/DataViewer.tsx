@@ -82,18 +82,18 @@ const DataViewer = () => {
     return schemas.find(schema => schema.collection_name === selectedTable)
   }
 
-  const initializeNewRecord = () => {
-    const schema = getSelectedSchema()
-    if (!schema) return {}
+  // const initializeNewRecord = () => {
+  //   const schema = getSelectedSchema()
+  //   if (!schema) return {}
 
-    const record: Record<string, any> = {}
-    schema.fields.forEach(field => {
-      if (field.name !== 'id') { // Skip ID field as it's auto-generated
-        record[field.name] = field.default || ''
-      }
-    })
-    return record
-  }
+  //   const record: Record<string, any> = {}
+  //   schema.fields.forEach(field => {
+  //     if (field.name !== 'id') { // Skip ID field as it's auto-generated
+  //       record[field.name] = field.default || ''
+  //     }
+  //   })
+  //   return record
+  // }
 
   const handleAddRecord = async () => {
     if (!hasMongoConnection) {
@@ -212,7 +212,7 @@ const DataViewer = () => {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-yellow-50 border border-yellow-200 rounded-xl p-4"
-        >
+        > 
           <div className="flex items-center space-x-2">
             <Warning className="w-4 h-4 text-yellow-600" />
             <span className="text-sm text-yellow-600">

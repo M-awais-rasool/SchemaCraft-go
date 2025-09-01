@@ -96,6 +96,10 @@ func SetupRoutes() *gin.Engine {
 		adminGroup.POST("/users/:id/reset-quota", adminController.ResetUserQuota)
 		adminGroup.GET("/stats", adminController.GetPlatformStats)
 		adminGroup.GET("/api-usage", adminController.GetAPIUsageStats)
+
+		// Quota management routes
+		adminGroup.POST("/migrate-quota-system", adminController.MigrateQuotaSystem)
+		adminGroup.POST("/reset-all-quota", adminController.ResetAllUsersQuota)
 	}
 
 	// Dynamic API routes (require API Key)

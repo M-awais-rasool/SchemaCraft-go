@@ -281,7 +281,7 @@ const AuthConfiguration = ({ authConfig, onAuthConfigChange, fields }: AuthConfi
                 />
                 <span className="text-sm font-medium text-black">Require email verification (coming soon)</span>
               </label>
-            </div>
+            </div> 
           </div>
 
           {/* Configuration Preview */}

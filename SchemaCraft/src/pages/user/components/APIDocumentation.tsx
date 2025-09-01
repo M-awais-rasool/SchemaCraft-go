@@ -345,7 +345,7 @@ const APIDocumentation = () => {
                 alert('No authentication token found. Please log in again.')
                 return
               }
-              
+               
               // Open user-specific Swagger UI
               const baseUrl = process.env.NODE_ENV === 'production' 
                 ? 'https://your-domain.com' 

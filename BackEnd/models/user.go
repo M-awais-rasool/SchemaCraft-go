@@ -28,6 +28,7 @@ type APIUsageStats struct {
 	LastRequest   time.Time `json:"last_request,omitempty" bson:"last_request,omitempty"`
 	MonthlyQuota  int64     `json:"monthly_quota" bson:"monthly_quota"`
 	UsedThisMonth int64     `json:"used_this_month" bson:"used_this_month"`
+	QuotaResetAt  time.Time `json:"quota_reset_at" bson:"quota_reset_at"`
 }
 
 type LoginRequest struct {

@@ -21,7 +21,7 @@ const AuthManager = () => {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
+ 
   // Form state
   const [tableName, setTableName] = useState('')
   const [userFields, setUserFields] = useState<SchemaField[]>([

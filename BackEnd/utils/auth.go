@@ -1,13 +1,18 @@
 package utils
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"os"
 	"time"
 
+	"schemacraft-backend/config"
+	"schemacraft-backend/models"
+
 	"github.com/golang-jwt/jwt/v5"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -77,4 +82,61 @@ func GenerateAPIKey() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+// CheckAndResetMonthlyQuota checks if a user's quota needs to be reset and resets it if necessary
+func CheckAndResetMonthlyQuota(userID primitive.ObjectID, apiUsage *models.APIUsageStats) (bool, error) {
+	now := time.Now()
+
+	// If QuotaResetAt is zero or if we're in a new month, reset the quota
+	if apiUsage.QuotaResetAt.IsZero() || IsNewMonth(apiUsage.QuotaResetAt, now) {
+		// Calculate next reset time (beginning of next month)
+		nextReset := GetNextMonthStart(now)
+
+		// Reset the quota
+		filter := bson.M{"_id": userID}
+		update := bson.M{
+			"$set": bson.M{
+				"api_usage.used_this_month": 0,
+				"api_usage.quota_reset_at":  nextReset,
+			},
+		}
+
+		// Use the global DB connection
+		_, err := config.DB.Collection("users").UpdateOne(context.TODO(), filter, update)
+		if err != nil {
+			return false, err
+		}
+
+		// Update the local struct
+		apiUsage.UsedThisMonth = 0
+		apiUsage.QuotaResetAt = nextReset
+
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// IsNewMonth checks if the current time is in a different month than the reset time
+func IsNewMonth(resetTime, currentTime time.Time) bool {
+	resetYear, resetMonth, _ := resetTime.Date()
+	currentYear, currentMonth, _ := currentTime.Date()
+
+	return resetYear != currentYear || resetMonth != currentMonth
+}
+
+// GetNextMonthStart returns the start of the next month
+func GetNextMonthStart(t time.Time) time.Time {
+	year, month, _ := t.Date()
+
+	// Move to next month
+	if month == 12 {
+		year++
+		month = 1
+	} else {
+		month++
+	}
+
+	return time.Date(year, month, 1, 0, 0, 0, 0, t.Location())
 }
