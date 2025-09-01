@@ -17,9 +17,10 @@ interface NotificationDropdownProps {
   isOpen: boolean
   onClose: () => void
   onNotificationUpdate?: () => void
+  setActiveTab: (tab: string) => void
 }
 
-const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose, onNotificationUpdate }) => {
+const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose, onNotificationUpdate,setActiveTab }) => {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -220,7 +221,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
         {/* Footer */}
         {notifications?.length > 0 && (
           <div className="p-3 border-t border-gray-200 text-center">
-            <button className="text-sm text-blue-600 hover:text-blue-800">
+            <button className="text-sm text-blue-600 hover:text-blue-800" onClick={() => setActiveTab('notifications')}>
               View all notifications
             </button>
           </div>

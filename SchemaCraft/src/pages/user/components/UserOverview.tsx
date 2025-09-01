@@ -12,7 +12,7 @@ import {
 } from '@mui/icons-material'
 import { UserService, type DashboardData } from '../../../services/userService'
 
-const UserOverview = () => {
+const UserOverview = ({setActiveTab}:any) => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -198,6 +198,7 @@ const UserOverview = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 + index * 0.1 }}
+              onClick={() => setActiveTab(action.action)}
               className="p-4 border border-gray-200 rounded-lg hover:border-black hover:shadow-md transition-all group text-left"
             >
               <div className="flex items-center space-x-3">

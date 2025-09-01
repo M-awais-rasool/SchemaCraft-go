@@ -53,7 +53,7 @@ const UserDashboard = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <UserOverview />
+        return <UserOverview setActiveTab={setActiveTab} />
       case 'apikey':
         return <APIKeyManager />
       case 'mongodb':
@@ -233,6 +233,7 @@ const UserDashboard = () => {
                 isOpen={notificationDropdownOpen}
                 onClose={() => setNotificationDropdownOpen(false)}
                 onNotificationUpdate={fetchUnreadCount}
+                setActiveTab={(tab) => setActiveTab(tab)}
               />
             </div>
 
@@ -260,8 +261,9 @@ const UserDashboard = () => {
                     className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50"
                   >
                     <div className="py-2">
-                      <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
-                      <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+                      <button className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={() => setActiveTab('settings')}>
+                        <p>Settings</p>
+                      </button>
                       <hr className="my-2" />
                       <button 
                         onClick={logout}
