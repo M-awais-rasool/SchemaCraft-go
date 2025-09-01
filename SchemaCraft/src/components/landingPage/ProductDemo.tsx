@@ -92,7 +92,7 @@ export function ProductDemo() {
   };
 
   return (
-    <section className="py-16 lg:py-24 bg-gradient-to-br from-muted/30 via-background to-muted/20 relative overflow-hidden">
+    <section id="demo" className="py-16 lg:py-24 bg-gradient-to-br from-muted/30 via-background to-muted/20 relative overflow-hidden">
       {/* Animated Background */}
       <div className="absolute inset-0">
         <motion.div

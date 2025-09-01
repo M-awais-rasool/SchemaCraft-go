@@ -12,6 +12,20 @@ import {
   Globe
 } from "lucide-react";
 
+// Smooth scroll utility function
+const smoothScrollToSection = (sectionId: string, offset: number = 80) => {
+  const element = document.getElementById(sectionId);
+  if (element) {
+    const elementPosition = element.getBoundingClientRect().top;
+    const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+    window.scrollTo({
+      top: offsetPosition,
+      behavior: 'smooth'
+    });
+  }
+};
+
 export function Footer() {
   return (
     <footer className="bg-primary text-primary-foreground">
@@ -49,14 +63,20 @@ export function Footer() {
             <h4 className="mb-4">Product</h4>
             <ul className="space-y-2">
               <li>
-                <a href="#features" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors duration-200">
+                <button 
+                  onClick={() => smoothScrollToSection('features')}
+                  className="text-primary-foreground/80 hover:text-primary-foreground transition-colors duration-200 bg-transparent border-none cursor-pointer"
+                >
                   Features
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#pricing" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors duration-200">
+                <button 
+                  onClick={() => smoothScrollToSection('pricing')}
+                  className="text-primary-foreground/80 hover:text-primary-foreground transition-colors duration-200 bg-transparent border-none cursor-pointer"
+                >
                   Pricing
-                </a>
+                </button>
               </li>
               <li>
                 <a href="#" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors duration-200">
@@ -81,9 +101,12 @@ export function Footer() {
             <h4 className="mb-4">Resources</h4>
             <ul className="space-y-2">
               <li>
-                <a href="#docs" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors duration-200">
+                <button 
+                  onClick={() => smoothScrollToSection('docs')}
+                  className="text-primary-foreground/80 hover:text-primary-foreground transition-colors duration-200 bg-transparent border-none cursor-pointer"
+                >
                   Documentation
-                </a>
+                </button>
               </li>
               <li>
                 <a href="#" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors duration-200">

@@ -2,10 +2,25 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { motion } from "framer-motion";
 import { Play, ArrowRight, Database, Users, Zap, Sparkles, Code, Globe } from "lucide-react";
+import { Link } from "react-router-dom";
+
+// Smooth scroll utility function
+const smoothScrollToSection = (sectionId: string, offset: number = 80) => {
+  const element = document.getElementById(sectionId);
+  if (element) {
+    const elementPosition = element.getBoundingClientRect().top;
+    const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+    window.scrollTo({
+      top: offsetPosition,
+      behavior: 'smooth'
+    });
+  }
+};
 
 export function Hero() {
   return (
-    <section className="bg-gradient-to-br from-background via-background to-muted/30 py-16 lg:py-24 overflow-hidden relative">
+    <section id="hero" className="bg-gradient-to-br from-background via-background to-muted/30 py-16 lg:py-24 overflow-hidden relative">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
@@ -38,7 +53,7 @@ export function Hero() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Content */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8 }}
@@ -65,20 +80,20 @@ export function Hero() {
 
             {/* Headline */}
             <motion.div className="mb-6">
-              <motion.h1 
+              <motion.h1
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3, duration: 0.8 }}
                 className="text-4xl md:text-6xl lg:text-7xl tracking-tight"
               >
-                <motion.span 
+                <motion.span
                   className="block"
                   whileHover={{ scale: 1.02 }}
                   transition={{ duration: 0.2 }}
                 >
                   Build Dynamic
                 </motion.span>
-                <motion.span 
+                <motion.span
                   className="block text-primary relative"
                   whileHover={{ scale: 1.02 }}
                   transition={{ duration: 0.2 }}
@@ -91,7 +106,7 @@ export function Hero() {
                     transition={{ duration: 0.3 }}
                   />
                 </motion.span>
-                <motion.span 
+                <motion.span
                   className="block"
                   whileHover={{ scale: 1.02 }}
                   transition={{ duration: 0.2 }}
@@ -102,19 +117,19 @@ export function Hero() {
             </motion.div>
 
             {/* Subtext */}
-            <motion.p 
+            <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 0.6 }}
               className="text-lg md:text-xl text-muted-foreground mb-10 leading-relaxed max-w-xl lg:max-w-none"
             >
-              Create, modify, and collaborate on database schemas in real-time. 
-              No more complex migrations or deployment headaches. Just pure flexibility 
+              Create, modify, and collaborate on database schemas in real-time.
+              No more complex migrations or deployment headaches. Just pure flexibility
               and team productivity.
             </motion.p>
 
             {/* CTA Buttons */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7, duration: 0.6 }}
@@ -132,10 +147,12 @@ export function Hero() {
                     whileHover={{ x: "100%" }}
                     transition={{ duration: 0.6 }}
                   />
-                  <span className="relative z-10 flex items-center">
-                    Start Building Free
-                    <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                  </span>
+                  <Link to="/login">
+                    <span className="relative z-10 flex items-center">
+                      Start Building Free
+                      <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+                    </span>
+                  </Link>
                 </Button>
               </motion.div>
               <motion.div
@@ -143,7 +160,12 @@ export function Hero() {
                 whileTap={{ scale: 0.95 }}
                 transition={{ duration: 0.2 }}
               >
-                <Button variant="outline" size="lg" className="px-8 py-3 text-lg group relative overflow-hidden">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="px-8 py-3 text-lg group relative overflow-hidden"
+                  onClick={() => smoothScrollToSection('demo')}
+                >
                   <motion.div
                     className="absolute inset-0 bg-muted/50"
                     initial={{ scale: 0 }}
@@ -159,12 +181,12 @@ export function Hero() {
             </motion.div>
 
             {/* Stats */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.9, duration: 0.6 }}
               className="flex flex-col sm:flex-row gap-6 justify-center lg:justify-start text-center lg:text-left"
-            > 
+            >
               {[
                 { icon: Users, label: "10k+ Teams", delay: 0 },
                 { icon: Database, label: "1M+ Tables Created", delay: 0.1 },
@@ -193,13 +215,13 @@ export function Hero() {
           </motion.div>
 
           {/* Animated Visual */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4, duration: 0.8 }}
             className="relative"
           >
-            <motion.div 
+            <motion.div
               whileHover={{ scale: 1.02, rotateY: 5 }}
               transition={{ duration: 0.3 }}
               className="bg-card rounded-2xl shadow-2xl overflow-hidden relative"
@@ -208,17 +230,17 @@ export function Hero() {
               {/* Mock Interface */}
               <div className="bg-muted/20 p-4 border-b border-border/20">
                 <div className="flex items-center gap-2 mb-3">
-                  <motion.div 
+                  <motion.div
                     className="w-3 h-3 bg-destructive rounded-full"
                     animate={{ scale: [1, 1.2, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}
                   />
-                  <motion.div 
+                  <motion.div
                     className="w-3 h-3 bg-yellow-400 rounded-full"
                     animate={{ scale: [1, 1.2, 1] }}
                     transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
                   />
-                  <motion.div 
+                  <motion.div
                     className="w-3 h-3 bg-green-500 rounded-full"
                     animate={{ scale: [1, 1.2, 1] }}
                     transition={{ duration: 2, repeat: Infinity, delay: 0.6 }}
@@ -226,10 +248,10 @@ export function Hero() {
                   <span className="ml-4 text-sm text-muted-foreground">schema-builder.dataforge.io</span>
                 </div>
               </div>
-              
+
               <div className="p-6">
                 {/* Schema Title */}
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 1, duration: 0.4 }}
@@ -253,7 +275,7 @@ export function Hero() {
                 {/* Animated Table Creation */}
                 <div className="space-y-3">
                   {/* Table Headers */}
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 1.2, duration: 0.4 }}
@@ -276,10 +298,10 @@ export function Hero() {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: field.delay, duration: 0.4 }}
-                      whileHover={{ 
-                        backgroundColor: "var(--color-muted)", 
+                      whileHover={{
+                        backgroundColor: "var(--color-muted)",
                         x: 5,
-                        scale: 1.02 
+                        scale: 1.02
                       }}
                       className="grid grid-cols-3 gap-3 py-2 text-sm border-b border-border/10 transition-colors rounded-md px-2 cursor-pointer"
                     >
@@ -288,12 +310,12 @@ export function Hero() {
                         {field.type}
                       </Badge>
                       <div className="flex gap-1">
-                        <motion.div 
+                        <motion.div
                           className="w-2 h-2 bg-green-500 rounded-full"
                           animate={{ scale: [1, 1.3, 1] }}
                           transition={{ duration: 1.5, repeat: Infinity, delay: index * 0.2 }}
                         />
-                        <motion.div 
+                        <motion.div
                           className="w-2 h-2 bg-blue-500 rounded-full"
                           animate={{ scale: [1, 1.3, 1] }}
                           transition={{ duration: 1.5, repeat: Infinity, delay: 0.5 + index * 0.2 }}
@@ -307,13 +329,13 @@ export function Hero() {
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 2.2, duration: 0.4 }}
-                    whileHover={{ 
+                    whileHover={{
                       scale: 1.02,
                       borderColor: "var(--color-primary)"
                     }}
                     className="border-2 border-dashed border-primary/30 rounded-lg p-3 text-center text-primary hover:border-primary/60 transition-all cursor-pointer group"
                   >
-                    <motion.span 
+                    <motion.span
                       className="text-sm flex items-center justify-center gap-2"
                       whileHover={{ scale: 1.05 }}
                     >
@@ -343,17 +365,16 @@ export function Hero() {
                         animate={{ scale: 1 }}
                         transition={{ delay: 2.6 + index * 0.2, duration: 0.3 }}
                         whileHover={{ scale: 1.2, zIndex: 10 }}
-                        className={`w-6 h-6 ${
-                          index === 0 ? 'bg-blue-500' : 
-                          index === 1 ? 'bg-green-500' : 'bg-purple-500'
-                        } rounded-full border-2 border-white flex items-center justify-center text-xs text-white cursor-pointer`}
+                        className={`w-6 h-6 ${index === 0 ? 'bg-blue-500' :
+                            index === 1 ? 'bg-green-500' : 'bg-purple-500'
+                          } rounded-full border-2 border-white flex items-center justify-center text-xs text-white cursor-pointer`}
                       >
                         {letter}
                       </motion.div>
                     ))}
                   </div>
                   <span className="text-xs text-muted-foreground">3 users editing</span>
-                  <motion.div 
+                  <motion.div
                     className="w-2 h-2 bg-green-500 rounded-full ml-2"
                     animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
                     transition={{ duration: 1.5, repeat: Infinity }}
@@ -364,7 +385,7 @@ export function Hero() {
 
             {/* Enhanced Floating Elements */}
             <motion.div
-              animate={{ 
+              animate={{
                 y: [-10, 10, -10],
                 rotate: [0, 5, 0],
                 scale: [1, 1.1, 1]
@@ -375,9 +396,9 @@ export function Hero() {
             >
               <Zap className="h-5 w-5" />
             </motion.div>
-            
+
             <motion.div
-              animate={{ 
+              animate={{
                 y: [10, -10, 10],
                 rotate: [0, -5, 0],
                 scale: [1, 1.1, 1]
@@ -390,7 +411,7 @@ export function Hero() {
             </motion.div>
 
             <motion.div
-              animate={{ 
+              animate={{
                 y: [-5, 5, -5],
                 rotate: [0, 10, 0],
                 scale: [1, 1.05, 1]

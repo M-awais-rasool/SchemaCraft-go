@@ -2,6 +2,21 @@ import { Database, Menu, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Link } from "react-router-dom";
+
+// Smooth scroll utility function
+const smoothScrollToSection = (sectionId: string, offset: number = 80) => {
+  const element = document.getElementById(sectionId);
+  if (element) {
+    const elementPosition = element.getBoundingClientRect().top;
+    const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+    window.scrollTo({
+      top: offsetPosition,
+      behavior: 'smooth'
+    });
+  }
+};
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -45,19 +60,25 @@ export function Header() {
             className="hidden md:flex items-center space-x-8"
           >
             {[
-              { href: "#", label: "Home" },
-              { href: "#features", label: "Features" },
-              { href: "#use-cases", label: "Use Cases" },
-              { href: "#pricing", label: "Pricing" },
-              { href: "#docs", label: "Docs" }
+              { href: "hero", label: "Home" },
+              { href: "features", label: "Features" },
+              { href: "demo", label: "Demo" },
+              { href: "pricing", label: "Pricing" },
+              { href: "docs", label: "Docs" }
             ].map((item, index) => (
-              <motion.a
+              <motion.button
                 key={item.label}
-                href={item.href}
+                onClick={() => {
+                  if (item.href === "hero") {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  } else {
+                    smoothScrollToSection(item.href);
+                  }
+                }}
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 + index * 0.1, duration: 0.3 }}
-                className="relative text-foreground hover:text-primary transition-colors duration-200 group"
+                className="relative text-foreground hover:text-primary transition-colors duration-200 group bg-transparent border-none cursor-pointer"
                 whileHover={{ scale: 1.05 }}
               >
                 {item.label}
@@ -66,7 +87,7 @@ export function Header() {
                   whileHover={{ width: "100%" }}
                   transition={{ duration: 0.3 }}
                 />
-              </motion.a>
+              </motion.button>
             ))}
           </motion.nav>
 
@@ -81,28 +102,21 @@ export function Header() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
-                Login
-              </Button>
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="hidden sm:inline-flex"
+                >
+                  <Link to="/login">
+                    Login
+                  </Link>
+                </Button>
             </motion.div>
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <Button size="sm" className="px-6 relative overflow-hidden group">
-                <motion.span 
-                  className="relative z-10"
-                  whileHover={{ scale: 1.05 }}
-                >
-                  Sign Up
-                </motion.span>
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-primary/80 to-primary"
-                  initial={{ x: "-100%" }}
-                  whileHover={{ x: "0%" }}
-                  transition={{ duration: 0.3 }}
-                />
-              </Button>
             </motion.div>
 
             {/* Mobile menu button */}
@@ -161,24 +175,30 @@ export function Header() {
                 className="flex flex-col space-y-3 py-4"
               >
                 {[
-                  { href: "#", label: "Home" },
-                  { href: "#features", label: "Features" },
-                  { href: "#use-cases", label: "Use Cases" },
-                  { href: "#pricing", label: "Pricing" },
-                  { href: "#docs", label: "Docs" }
+                  { href: "hero", label: "Home" },
+                  { href: "features", label: "Features" },
+                  { href: "demo", label: "Demo" },
+                  { href: "pricing", label: "Pricing" },
+                  { href: "docs", label: "Docs" }
                 ].map((item, index) => (
-                  <motion.a
+                  <motion.button
                     key={item.label}
-                    href={item.href}
+                    onClick={() => {
+                      if (item.href === "hero") {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      } else {
+                        smoothScrollToSection(item.href);
+                      }
+                      setIsMenuOpen(false);
+                    }}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1, duration: 0.3 }}
-                    className="text-foreground hover:text-primary transition-colors duration-200 px-2 py-1 rounded-md hover:bg-muted/50"
+                    className="text-foreground hover:text-primary transition-colors duration-200 px-2 py-1 rounded-md hover:bg-muted/50 bg-transparent border-none cursor-pointer text-left w-full"
                     whileHover={{ x: 10 }}
-                    onClick={() => setIsMenuOpen(false)}
                   >
                     {item.label}
-                  </motion.a>
+                  </motion.button>
                 ))}
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
