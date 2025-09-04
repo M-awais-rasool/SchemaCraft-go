@@ -263,19 +263,52 @@ curl -X GET http://localhost:8080/api/users \
 
 ## 🚀 Deployment
 
+### Quick Deployment to AWS EC2
+
+For detailed deployment instructions, see [BackEnd/DEPLOYMENT.md](BackEnd/DEPLOYMENT.md).
+
+#### Prerequisites
+- AWS EC2 instance (Amazon Linux 2 or Ubuntu)
+- Domain name (optional)
+- GitHub repository
+
+#### One-Command EC2 Setup
+```bash
+# On your EC2 instance
+wget https://raw.githubusercontent.com/M-awais-rasool/SchemaCraft/main/BackEnd/scripts/setup-ec2.sh
+chmod +x setup-ec2.sh
+./setup-ec2.sh
+```
+
+#### Automatic GitHub Deployment
+1. Configure GitHub Secrets:
+   - `EC2_SSH_KEY`: SSH private key for GitHub Actions
+   - `EC2_HOST`: Your EC2 public IP or domain
+   - `EC2_USER`: `ec2-user`
+   - `DEPLOY_PATH`: `/opt/schemacraft`
+
+2. Push to `main` branch - automatic deployment via GitHub Actions!
+
+#### Manual Deployment
+```bash
+cd /opt/schemacraft/BackEnd
+./scripts/deploy.sh
+```
+
+#### Local Development with Docker
+```bash
+cd BackEnd
+./scripts/dev-start.sh
+```
+
 ### Frontend (Vercel/Netlify)
 ```bash
+cd SchemaCraft
 npm run build
 # Deploy the 'dist' folder
 ```
 
-### Backend (Railway/Fly.io/AWS)
-```bash
-go build -o schemacraft-backend
-# Deploy the binary
-```
-
-### Environment Variables for Production
+### Production Environment Variables
 ```env
 PORT=8080
 MONGODB_URI=your-production-mongodb-uri
@@ -283,6 +316,16 @@ DATABASE_NAME=schemacraft_prod
 JWT_SECRET=your-super-secure-production-jwt-secret
 GIN_MODE=release
 ```
+
+### Production Features
+- ✅ Docker containerization
+- ✅ Nginx reverse proxy
+- ✅ SSL/TLS support (Let's Encrypt)
+- ✅ Auto-scaling ready
+- ✅ Health checks
+- ✅ Log management
+- ✅ Database optimization
+- ✅ CI/CD pipeline
 
 ## 🤝 Contributing
 

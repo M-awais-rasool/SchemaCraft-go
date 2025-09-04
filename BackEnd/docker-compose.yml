@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - MONGODB_URI=mongodb://mongo:27017
+      - DATABASE_NAME=schemacraft
+      - JWT_SECRET=development-secret-key-change-in-production
+      - GIN_MODE=debug
+    depends_on:
+      - mongo
+    volumes:
+      - .:/app
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=schemacraft
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
