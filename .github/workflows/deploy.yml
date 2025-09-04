@@ -61,9 +61,42 @@ jobs:
     - name: Deploy to EC2
       run: |
         ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "
+          # Check if Docker is installed
+          if ! command -v docker &> /dev/null; then
+            echo 'Docker not found. Please run the setup script first.'
+            exit 1
+          fi
+          
+          # Check if deploy directory exists
+          if [ ! -d '${{ secrets.DEPLOY_PATH }}' ]; then
+            echo 'Deploy directory not found. Please run the setup script first.'
+            exit 1
+          fi
+          
+          # Navigate to deploy directory
           cd ${{ secrets.DEPLOY_PATH }}
+          
+          # Check if git repository exists
+          if [ ! -d '.git' ]; then
+            echo 'Git repository not found. Please clone the repository first.'
+            exit 1
+          fi
+          
+          # Pull latest changes
           git pull origin main
+          
+          # Navigate to backend directory
           cd BackEnd
+          
+          # Check if .env file exists
+          if [ ! -f '.env' ]; then
+            echo 'Environment file not found. Please create .env file first.'
+            cp .env.example .env
+            echo 'Please configure the .env file with your settings.'
+            exit 1
+          fi
+          
+          # Build and deploy
           docker build -t schemacraft-backend .
           docker stop schemacraft-backend || true
           docker rm schemacraft-backend || true
@@ -79,4 +112,11 @@ jobs:
     - name: Verify deployment
       run: |
         sleep 30
-        curl -f http://${{ secrets.EC2_HOST }}:8080/health || exit 1
+        if curl -f http://${{ secrets.EC2_HOST }}:8080/health; then
+          echo "✅ Deployment successful!"
+        else
+          echo "❌ Deployment verification failed!"
+          echo "Please check the application logs on EC2:"
+          echo "ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'docker logs schemacraft-backend'"
+          exit 1
+        fi
