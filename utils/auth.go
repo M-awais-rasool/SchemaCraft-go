@@ -84,16 +84,12 @@ func GenerateAPIKey() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-// CheckAndResetMonthlyQuota checks if a user's quota needs to be reset and resets it if necessary
 func CheckAndResetMonthlyQuota(userID primitive.ObjectID, apiUsage *models.APIUsageStats) (bool, error) {
 	now := time.Now()
 
-	// If QuotaResetAt is zero or if we're in a new month, reset the quota
 	if apiUsage.QuotaResetAt.IsZero() || IsNewMonth(apiUsage.QuotaResetAt, now) {
-		// Calculate next reset time (beginning of next month)
 		nextReset := GetNextMonthStart(now)
 
-		// Reset the quota
 		filter := bson.M{"_id": userID}
 		update := bson.M{
 			"$set": bson.M{
@@ -102,13 +98,11 @@ func CheckAndResetMonthlyQuota(userID primitive.ObjectID, apiUsage *models.APIUs
 			},
 		}
 
-		// Use the global DB connection
 		_, err := config.DB.Collection("users").UpdateOne(context.TODO(), filter, update)
 		if err != nil {
 			return false, err
 		}
 
-		// Update the local struct
 		apiUsage.UsedThisMonth = 0
 		apiUsage.QuotaResetAt = nextReset
 
@@ -118,7 +112,6 @@ func CheckAndResetMonthlyQuota(userID primitive.ObjectID, apiUsage *models.APIUs
 	return false, nil
 }
 
-// IsNewMonth checks if the current time is in a different month than the reset time
 func IsNewMonth(resetTime, currentTime time.Time) bool {
 	resetYear, resetMonth, _ := resetTime.Date()
 	currentYear, currentMonth, _ := currentTime.Date()
@@ -126,11 +119,9 @@ func IsNewMonth(resetTime, currentTime time.Time) bool {
 	return resetYear != currentYear || resetMonth != currentMonth
 }
 
-// GetNextMonthStart returns the start of the next month
 func GetNextMonthStart(t time.Time) time.Time {
 	year, month, _ := t.Date()
 
-	// Move to next month
 	if month == 12 {
 		year++
 		month = 1
