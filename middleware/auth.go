@@ -40,7 +40,6 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Store user info in context
 		c.Set("user_id", claims.UserID)
 		c.Set("user_email", claims.Email)
 		c.Set("is_admin", claims.IsAdmin)
@@ -58,7 +57,6 @@ func APIKeyMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Find user by API key
 		var user models.User
 		err := config.DB.Collection("users").FindOne(context.TODO(), bson.M{"api_key": apiKey, "is_active": true}).Decode(&user)
 		if err != nil {
@@ -67,14 +65,11 @@ func APIKeyMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Check and reset monthly quota if necessary
 		quotaReset, err := utils.CheckAndResetMonthlyQuota(user.ID, &user.APIUsage)
 		if err != nil {
-			// Log error but continue - don't fail the request due to quota reset issues
 			fmt.Printf("Error checking/resetting quota for user %s: %v\n", user.ID.Hex(), err)
 		}
 
-		// If quota was reset, fetch updated user data
 		if quotaReset {
 			err = config.DB.Collection("users").FindOne(context.TODO(), bson.M{"_id": user.ID}).Decode(&user)
 			if err != nil {
@@ -84,7 +79,6 @@ func APIKeyMiddleware() gin.HandlerFunc {
 			}
 		}
 
-		// Check if user has exceeded their quota
 		if user.APIUsage.UsedThisMonth >= user.APIUsage.MonthlyQuota {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":   "API quota exceeded",
@@ -108,16 +102,13 @@ func APIKeyMiddleware() gin.HandlerFunc {
 				return
 			}
 
-			// If update was successful, check for notifications
 			if result.ModifiedCount > 0 {
-				// Get updated user data to check new usage
 				var updatedUser models.User
 				err := config.DB.Collection("users").FindOne(context.TODO(), bson.M{"_id": user.ID}).Decode(&updatedUser)
 				if err != nil {
 					return
 				}
 
-				// Check and create API usage notifications
 				notificationService := utils.NewNotificationService()
 				err = notificationService.CheckAndCreateAPIUsageNotifications(
 					updatedUser.ID,
@@ -126,13 +117,11 @@ func APIKeyMiddleware() gin.HandlerFunc {
 					updatedUser.APIUsage.MonthlyQuota,
 				)
 				if err != nil {
-					// Log error but don't fail the request
 					return
 				}
 			}
 		}()
 
-		// Store user info in context
 		c.Set("api_user_id", user.ID)
 		c.Set("api_user", user)
 
