@@ -29,13 +29,28 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Debug connection info
+        run: |
+          echo "Attempting to connect to host: ${{ secrets.EC2_HOST }}"
+          echo "Using username: ${{ secrets.EC2_USER }}"
+      
+      - name: Test connectivity
+        run: |
+          timeout 10 nc -zv ${{ secrets.EC2_HOST }} 22 || echo "Cannot reach host on port 22"
+      
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 60s
+          command_timeout: 300s
+          debug: true
           script: |
+            # Check if docker is running
+            sudo systemctl status docker || sudo systemctl start docker
+            
             # Pull latest image
             docker pull ${{ secrets.DOCKER_USERNAME }}/schemacraft-backend:latest
             
@@ -48,3 +63,6 @@ jobs:
             
             # Clean up unused images
             docker image prune -f
+            
+            # Show running containers for verification
+            docker ps
