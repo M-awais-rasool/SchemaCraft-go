@@ -80,7 +80,6 @@ func GetUserDatabase(mongoURI, dbName string) (*mongo.Database, error) {
 	return db, nil
 }
 
-// TestMongoConnection tests a MongoDB connection without storing it
 func TestMongoConnection(mongoURI, dbName string) error {
 	if mongoURI == "" {
 		return errors.New("MongoDB URI cannot be empty")
