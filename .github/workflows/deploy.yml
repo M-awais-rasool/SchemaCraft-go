@@ -52,17 +52,17 @@ jobs:
             sudo systemctl status docker || sudo systemctl start docker
             
             # Pull latest image
-            docker pull ${{ secrets.DOCKER_USERNAME }}/schemacraft-backend:latest
+            sudo docker pull ${{ secrets.DOCKER_USERNAME }}/schemacraft-backend:latest
             
             # Stop and remove old container
-            docker stop go-app-container || true
-            docker rm go-app-container || true
+            sudo docker stop go-app-container || true
+            sudo docker rm go-app-container || true
             
             # Run new container
-            docker run -d -p 8080:8080 --name go-app-container ${{ secrets.DOCKER_USERNAME }}/schemacraft-backend:latest
+            sudo docker run -d -p 8080:8080 --name go-app-container ${{ secrets.DOCKER_USERNAME }}/schemacraft-backend:latest
             
             # Clean up unused images
-            docker image prune -f
+            sudo docker image prune -f
             
             # Show running containers for verification
-            docker ps
+            sudo docker ps
