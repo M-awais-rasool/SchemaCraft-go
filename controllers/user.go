@@ -11,6 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type UserController struct{}
@@ -68,6 +70,18 @@ func (uc *UserController) GetDashboard(c *gin.Context) {
 		schemas = []models.Schema{}
 	}
 
+	// Get recent activities (last 5)
+	activityCursor, err := config.DB.Collection("activities").Find(
+		context.TODO(),
+		bson.M{"user_id": userID},
+		options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}}).SetLimit(5),
+	)
+	var recentActivities []models.Activity
+	if err == nil {
+		defer activityCursor.Close(context.TODO())
+		activityCursor.All(context.TODO(), &recentActivities)
+	}
+
 	dashboardData := gin.H{
 		"user": gin.H{
 			"id":            user.ID.Hex(),
@@ -84,7 +98,8 @@ func (uc *UserController) GetDashboard(c *gin.Context) {
 			"api_usage":     user.APIUsage,
 			"has_custom_db": user.MongoDBURI != "",
 		},
-		"schemas": schemas,
+		"schemas":           schemas,
+		"recent_activities": recentActivities,
 	}
 
 	c.JSON(http.StatusOK, dashboardData)
@@ -122,6 +137,9 @@ func (uc *UserController) RegenerateAPIKey(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update API key"})
 		return
 	}
+
+	// Log API key regeneration activity
+	go LogActivityWithContext(c, userID.(primitive.ObjectID), models.ActivityTypeSecurity, "Generated new API key", "API key regenerated for security", "api_key", "", nil)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "API key regenerated successfully",
@@ -694,7 +712,6 @@ func (uc *UserController) GetSwaggerUI(c *gin.Context) {
 		swaggerSpecURL += "?token=" + token
 	}
 
-	// HTML template for Swagger UI
 	swaggerHTML := `
 <!DOCTYPE html>
 <html lang="en">

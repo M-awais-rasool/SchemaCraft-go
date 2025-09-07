@@ -103,6 +103,9 @@ func (ac *AuthController) Signup(c *gin.Context) {
 		return
 	}
 
+	// Log signup activity
+	go LogActivityWithContext(c, user.ID, models.ActivityTypeAuth, "User signed up", "New user account created", "user", user.ID.Hex(), nil)
+
 	// Remove password from response
 	user.Password = ""
 
@@ -157,6 +160,9 @@ func (ac *AuthController) Signin(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
+
+	// Log login activity
+	go LogActivityWithContext(c, user.ID, models.ActivityTypeLogin, "User signed in", "User logged into account", "user", user.ID.Hex(), nil)
 
 	// Remove password from response
 	user.Password = ""
@@ -273,6 +279,11 @@ func (ac *AuthController) UpdateMongoURI(c *gin.Context) {
 		// Log the notification error but don't fail the request
 		fmt.Printf("Failed to create success notification: %v\n", notificationErr)
 	}
+
+	// Log MongoDB connection activity
+	go LogActivityWithContext(c, userID.(primitive.ObjectID), models.ActivityTypeConnect, "MongoDB database connected", "Custom MongoDB database connection configured", "database", req.DatabaseName, map[string]any{
+		"database_name": req.DatabaseName,
+	})
 
 	c.JSON(http.StatusOK, gin.H{"message": "MongoDB URI updated successfully"})
 }

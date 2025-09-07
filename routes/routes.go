@@ -2,7 +2,7 @@ package routes
 
 import (
 	"schemacraft-backend/controllers"
-	_ "schemacraft-backend/docs" 
+	_ "schemacraft-backend/docs"
 	"schemacraft-backend/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -22,6 +22,7 @@ func SetupRoutes() *gin.Engine {
 	dynamicAPIController := controllers.NewDynamicAPIController()
 	dynamicAuthController := controllers.NewDynamicAuthController()
 	notificationController := controllers.NewNotificationController()
+	activityController := controllers.NewActivityController()
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -59,6 +60,9 @@ func SetupRoutes() *gin.Engine {
 		protectedGroup.PUT("/notifications/read-all", notificationController.MarkAllAsRead)
 		protectedGroup.DELETE("/notifications/:id", notificationController.DeleteNotification)
 		protectedGroup.GET("/notifications/unread-count", notificationController.GetUnreadCount)
+
+		protectedGroup.GET("/activities", activityController.GetActivities)
+		protectedGroup.POST("/activities", activityController.CreateActivity)
 
 		protectedGroup.GET("/user/dashboard", userController.GetDashboard)
 		protectedGroup.POST("/user/regenerate-api-key", userController.RegenerateAPIKey)

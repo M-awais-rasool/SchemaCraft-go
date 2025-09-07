@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"schemacraft-backend/config"
+	"schemacraft-backend/controllers"
 	"schemacraft-backend/models"
 	"schemacraft-backend/utils"
 
@@ -90,7 +91,7 @@ func APIKeyMiddleware() gin.HandlerFunc {
 			})
 			c.Abort()
 			return
-		} // Update API usage stats and check for notifications
+		}
 		go func() {
 			filter := bson.M{"_id": user.ID}
 			update := bson.M{
@@ -101,6 +102,13 @@ func APIKeyMiddleware() gin.HandlerFunc {
 			if err != nil {
 				return
 			}
+
+			// Log API activity
+			controllers.LogActivity(user.ID, models.ActivityTypeAPI, fmt.Sprintf("API call to %s", c.Request.URL.Path), "API endpoint accessed", "api", c.Request.URL.Path, map[string]any{
+				"method":     c.Request.Method,
+				"endpoint":   c.Request.URL.Path,
+				"user_agent": c.GetHeader("User-Agent"),
+			})
 
 			if result.ModifiedCount > 0 {
 				var updatedUser models.User
@@ -150,14 +158,12 @@ func DynamicAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Skip auth endpoints
 		path := c.Request.URL.Path
 		if strings.Contains(path, "/auth/") {
 			c.Next()
 			return
 		}
 
-		// Get API user first
 		apiUserID, exists := c.Get("api_user_id")
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -167,7 +173,6 @@ func DynamicAuthMiddleware() gin.HandlerFunc {
 
 		userID := apiUserID.(primitive.ObjectID)
 
-		// Check if auth is enabled for this collection
 		var schema models.Schema
 		filter := bson.M{"user_id": userID, "collection_name": collection, "is_active": true}
 		err := config.DB.Collection("schemas").FindOne(context.TODO(), filter).Decode(&schema)
@@ -177,7 +182,6 @@ func DynamicAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Check if the current endpoint requires protection
 		method := strings.ToLower(c.Request.Method)
 		requiresAuth := false
 
@@ -194,13 +198,11 @@ func DynamicAuthMiddleware() gin.HandlerFunc {
 			}
 		}
 
-		// If no protection required for this endpoint, proceed
 		if !requiresAuth {
 			c.Next()
 			return
 		}
 
-		// Auth is required, validate token
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
@@ -215,9 +217,7 @@ func DynamicAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// If auth is required but no auth config exists, check for a valid auth system
 		if schema.AuthConfig == nil || !schema.AuthConfig.Enabled {
-			// Look for any available auth system for this user
 			var authSchema models.Schema
 			authFilter := bson.M{
 				"user_id":             userID,
@@ -231,11 +231,9 @@ func DynamicAuthMiddleware() gin.HandlerFunc {
 				return
 			}
 
-			// Use the auth system from the found schema
 			schema.AuthConfig = authSchema.AuthConfig
 		}
 
-		// Validate token
 		jwtSecret := schema.AuthConfig.JWTSecret
 		if jwtSecret == "" {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "JWT secret not configured"})
@@ -260,14 +258,12 @@ func DynamicAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Verify token belongs to this user (collection doesn't need to match for cross-table auth)
 		if claims.UserID != userID {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token not valid for this user"})
 			c.Abort()
 			return
 		}
 
-		// Store dynamic auth info in context
 		c.Set("dynamic_auth_user_id", claims.SchemaUserID)
 		c.Set("dynamic_auth_schema_id", claims.SchemaID)
 

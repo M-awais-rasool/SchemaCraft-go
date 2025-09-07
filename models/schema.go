@@ -32,22 +32,22 @@ type AuthConfig struct {
 	LoginFields              AuthFieldConfig `json:"login_fields" bson:"login_fields"`
 	ResponseFields           []string        `json:"response_fields" bson:"response_fields"`
 	PasswordField            string          `json:"password_field" bson:"password_field"`
-	TokenExpiration          int             `json:"token_expiration" bson:"token_expiration"` // in hours
+	TokenExpiration          int             `json:"token_expiration" bson:"token_expiration"`
 	RequireEmailVerification bool            `json:"require_email_verification" bson:"require_email_verification"`
 	AllowSignup              bool            `json:"allow_signup" bson:"allow_signup"`
-	JWTSecret                string          `json:"-" bson:"jwt_secret"` // Hidden from JSON response
+	JWTSecret                string          `json:"-" bson:"jwt_secret"`
 }
 
 type AuthFieldConfig struct {
 	EmailField    string `json:"email_field" bson:"email_field"`
 	UsernameField string `json:"username_field,omitempty" bson:"username_field,omitempty"`
-	AllowBoth     bool   `json:"allow_both" bson:"allow_both"` // Allow login with either email or username
+	AllowBoth     bool   `json:"allow_both" bson:"allow_both"`
 }
 
 type SchemaField struct {
 	Name        string      `json:"name" bson:"name" binding:"required"`
-	Type        string      `json:"type" bson:"type" binding:"required"` // string, number, boolean, date, object, array
-	Visibility  string      `json:"visibility" bson:"visibility"`        // public, private
+	Type        string      `json:"type" bson:"type" binding:"required"` 
+	Visibility  string      `json:"visibility" bson:"visibility"`       
 	Required    bool        `json:"required" bson:"required"`
 	Default     interface{} `json:"default,omitempty" bson:"default,omitempty"`
 	Description string      `json:"description,omitempty" bson:"description,omitempty"`
@@ -68,9 +68,8 @@ type DynamicData struct {
 	UserID    primitive.ObjectID     `json:"user_id" bson:"user_id"`
 }
 
-// Dynamic API Authentication Models
 type DynamicAuthLoginRequest struct {
-	Identifier string `json:"identifier" binding:"required"` // Can be email or username
+	Identifier string `json:"identifier" binding:"required"` 
 	Password   string `json:"password" binding:"required"`
 }
 

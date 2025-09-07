@@ -195,6 +195,13 @@ func (sc *SchemaController) CreateSchema(c *gin.Context) {
 		return
 	}
 
+	// Log schema creation activity
+	go LogActivityWithContext(c, userID.(primitive.ObjectID), models.ActivityTypeCreate, "Created table \""+req.CollectionName+"\"", "New database table schema created", "schema", schema.ID.Hex(), map[string]any{
+		"collection_name": req.CollectionName,
+		"field_count":     len(req.Fields),
+		"has_auth":        req.AuthConfig != nil && req.AuthConfig.Enabled,
+	})
+
 	c.JSON(http.StatusCreated, schema)
 }
 
