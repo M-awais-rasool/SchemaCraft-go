@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 
 	"schemacraft-backend/config"
 	"schemacraft-backend/models"
@@ -237,6 +238,7 @@ func (uc *UserController) GetAPIDocumentation(c *gin.Context) {
 	}
 
 	// Build API documentation data
+	scheme := getScheme(c)
 	apiDoc := gin.H{
 		"swagger": "2.0",
 		"info": gin.H{
@@ -250,7 +252,7 @@ func (uc *UserController) GetAPIDocumentation(c *gin.Context) {
 		},
 		"host":     c.Request.Host,
 		"basePath": "/api",
-		"schemes":  []string{"http", "https"},
+		"schemes":  []string{scheme},
 		"produces": []string{"application/json"},
 		"consumes": []string{"application/json"},
 		"security": []gin.H{
@@ -799,13 +801,34 @@ func (uc *UserController) GetSwaggerUI(c *gin.Context) {
 	c.String(http.StatusOK, swaggerHTML)
 }
 
-// Helper function to get the scheme (http/https)
 func getScheme(c *gin.Context) string {
+	if os.Getenv("FORCE_HTTPS") == "true" || os.Getenv("GIN_MODE") == "release" {
+		return "https"
+	}
+
 	if c.Request.TLS != nil {
 		return "https"
 	}
-	if c.GetHeader("X-Forwarded-Proto") == "https" {
+
+	if forwardedProto := c.GetHeader("X-Forwarded-Proto"); forwardedProto != "" {
+		return forwardedProto
+	}
+
+	if c.GetHeader("CF-Visitor") != "" {
 		return "https"
 	}
+
+	if c.GetHeader("X-Forwarded-Ssl") == "on" {
+		return "https"
+	}
+
+	if c.GetHeader("X-Url-Scheme") == "https" {
+		return "https"
+	}
+
+	if c.Request.Header.Get("X-Real-IP") != "" || c.Request.Header.Get("X-Forwarded-For") != "" {
+		return "https"
+	}
+
 	return "http"
 }
