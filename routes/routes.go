@@ -73,6 +73,7 @@ func SetupRoutes() *gin.Engine {
 		protectedGroup.POST("/schemas", schemaController.CreateSchema)
 		protectedGroup.GET("/schemas", schemaController.GetSchemas)
 		protectedGroup.GET("/schemas/:id", schemaController.GetSchemaByID)
+		protectedGroup.PUT("/schemas/:id", schemaController.UpdateSchema)
 		protectedGroup.DELETE("/schemas/:id", schemaController.DeleteSchema)
 	}
 
