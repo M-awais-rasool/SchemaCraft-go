@@ -1,4 +1,4 @@
-module schemacraft-backend
+module github.com/M-awais-rasool/SchemaCraft-go
 
 go 1.23.0
 

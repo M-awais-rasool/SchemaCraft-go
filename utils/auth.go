@@ -6,11 +6,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"github.com/M-awais-rasool/SchemaCraft-go/config"
 	"time"
 
-	"schemacraft-backend/config"
-	"schemacraft-backend/models"
-
+	"github.com/M-awais-rasool/SchemaCraft-go/models"
 	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"

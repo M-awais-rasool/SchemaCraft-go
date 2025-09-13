@@ -3,12 +3,11 @@ package controllers
 import (
 	"context"
 	"net/http"
+	"github.com/M-awais-rasool/SchemaCraft-go/config"
 	"strconv"
 	"time"
 
-	"schemacraft-backend/config"
-	"schemacraft-backend/models"
-
+	"github.com/M-awais-rasool/SchemaCraft-go/models"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"

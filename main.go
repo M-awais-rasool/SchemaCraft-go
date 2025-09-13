@@ -4,9 +4,8 @@ import (
 	"log"
 	"os"
 
-	"schemacraft-backend/config"
-	"schemacraft-backend/routes"
-
+	"github.com/M-awais-rasool/SchemaCraft-go/config"
+	"github.com/M-awais-rasool/SchemaCraft-go/routes"
 	"github.com/joho/godotenv"
 )
 

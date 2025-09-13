@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"schemacraft-backend/config"
-	"schemacraft-backend/models"
+	"github.com/M-awais-rasool/SchemaCraft-go/config"
+	"github.com/M-awais-rasool/SchemaCraft-go/models"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"

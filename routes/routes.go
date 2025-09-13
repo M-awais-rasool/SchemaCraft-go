@@ -1,10 +1,10 @@
 package routes
 
 import (
-	"schemacraft-backend/controllers"
-	_ "schemacraft-backend/docs"
-	"schemacraft-backend/middleware"
+	"github.com/M-awais-rasool/SchemaCraft-go/controllers"
+	_ "github.com/M-awais-rasool/SchemaCraft-go/docs"
 
+	"github.com/M-awais-rasool/SchemaCraft-go/middleware"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"

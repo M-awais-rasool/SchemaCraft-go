@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"schemacraft-backend/config"
-	"schemacraft-backend/models"
+	"github.com/M-awais-rasool/SchemaCraft-go/config"
+	"github.com/M-awais-rasool/SchemaCraft-go/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"

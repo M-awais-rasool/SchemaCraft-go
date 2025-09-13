@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"schemacraft-backend/config"
+	"github.com/M-awais-rasool/SchemaCraft-go/config"
 
 	"go.mongodb.org/mongo-driver/bson"
 )

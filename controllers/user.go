@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"os"
 
-	"schemacraft-backend/config"
-	"schemacraft-backend/models"
-	"schemacraft-backend/utils"
+	"github.com/M-awais-rasool/SchemaCraft-go/config"
+	"github.com/M-awais-rasool/SchemaCraft-go/models"
+	"github.com/M-awais-rasool/SchemaCraft-go/utils"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"

@@ -3,11 +3,10 @@ package utils
 import (
 	"context"
 	"fmt"
+	"github.com/M-awais-rasool/SchemaCraft-go/config"
 	"time"
 
-	"schemacraft-backend/config"
-	"schemacraft-backend/models"
-
+	"github.com/M-awais-rasool/SchemaCraft-go/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
