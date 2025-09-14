@@ -64,12 +64,13 @@ func (sc *SchemaController) CreateSchema(c *gin.Context) {
 
 	// Validate field types
 	validTypes := map[string]bool{
-		"string":  true,
-		"number":  true,
-		"boolean": true,
-		"date":    true,
-		"object":  true,
-		"array":   true,
+		"string":   true,
+		"number":   true,
+		"boolean":  true,
+		"date":     true,
+		"object":   true,
+		"array":    true,
+		"relation": true,
 	}
 
 	for _, field := range req.Fields {
@@ -77,6 +78,29 @@ func (sc *SchemaController) CreateSchema(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid field type: " + field.Type})
 			return
 		}
+
+		// Validate relation fields
+		if field.Type == "relation" {
+			if field.Target == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Target collection is required for relation field: " + field.Name})
+				return
+			}
+
+			// Check if target collection exists and belongs to the same user
+			var targetSchema models.Schema
+			targetFilter := bson.M{"user_id": userID, "collection_name": field.Target, "is_active": true}
+			targetErr := config.DB.Collection("schemas").FindOne(context.TODO(), targetFilter).Decode(&targetSchema)
+			if targetErr != nil {
+				if targetErr == mongo.ErrNoDocuments {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Target collection '" + field.Target + "' not found for relation field: " + field.Name})
+					return
+				} else {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error while validating target collection"})
+					return
+				}
+			}
+		}
+
 		if field.Visibility == "" {
 			field.Visibility = "public" // Default to public
 		}
@@ -360,12 +384,13 @@ func (sc *SchemaController) UpdateSchema(c *gin.Context) {
 
 	// Validate field types
 	validTypes := map[string]bool{
-		"string":  true,
-		"number":  true,
-		"boolean": true,
-		"date":    true,
-		"object":  true,
-		"array":   true,
+		"string":   true,
+		"number":   true,
+		"boolean":  true,
+		"date":     true,
+		"object":   true,
+		"array":    true,
+		"relation": true,
 	}
 
 	for _, field := range req.Fields {
@@ -373,6 +398,29 @@ func (sc *SchemaController) UpdateSchema(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid field type: " + field.Type})
 			return
 		}
+
+		// Validate relation fields
+		if field.Type == "relation" {
+			if field.Target == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Target collection is required for relation field: " + field.Name})
+				return
+			}
+
+			// Check if target collection exists and belongs to the same user
+			var targetSchema models.Schema
+			targetFilter := bson.M{"user_id": userID, "collection_name": field.Target, "is_active": true}
+			targetErr := config.DB.Collection("schemas").FindOne(context.TODO(), targetFilter).Decode(&targetSchema)
+			if targetErr != nil {
+				if targetErr == mongo.ErrNoDocuments {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Target collection '" + field.Target + "' not found for relation field: " + field.Name})
+					return
+				} else {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error while validating target collection"})
+					return
+				}
+			}
+		}
+
 		if field.Visibility == "" {
 			field.Visibility = "public" // Default to public
 		}

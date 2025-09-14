@@ -6,8 +6,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
-	"github.com/M-awais-rasool/SchemaCraft-go/config"
 	"time"
+
+	"github.com/M-awais-rasool/SchemaCraft-go/config"
 
 	"github.com/M-awais-rasool/SchemaCraft-go/models"
 	"github.com/golang-jwt/jwt/v5"
@@ -81,6 +82,21 @@ func GenerateAPIKey() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+func GenerateSecurePassword() (string, error) {
+	// Generate a 16-character secure password with mix of letters, numbers, and symbols
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+
+	for i, b := range bytes {
+		bytes[i] = charset[b%byte(len(charset))]
+	}
+
+	return string(bytes), nil
 }
 
 func CheckAndResetMonthlyQuota(userID primitive.ObjectID, apiUsage *models.APIUsageStats) (bool, error) {

@@ -46,11 +46,12 @@ type AuthFieldConfig struct {
 
 type SchemaField struct {
 	Name        string      `json:"name" bson:"name" binding:"required"`
-	Type        string      `json:"type" bson:"type" binding:"required"` 
-	Visibility  string      `json:"visibility" bson:"visibility"`       
+	Type        string      `json:"type" bson:"type" binding:"required"`
+	Visibility  string      `json:"visibility" bson:"visibility"`
 	Required    bool        `json:"required" bson:"required"`
 	Default     interface{} `json:"default,omitempty" bson:"default,omitempty"`
 	Description string      `json:"description,omitempty" bson:"description,omitempty"`
+	Target      string      `json:"target,omitempty" bson:"target,omitempty"` // For relation fields, specifies target collection
 }
 
 type CreateSchemaRequest struct {
@@ -69,7 +70,7 @@ type DynamicData struct {
 }
 
 type DynamicAuthLoginRequest struct {
-	Identifier string `json:"identifier" binding:"required"` 
+	Identifier string `json:"identifier" binding:"required"`
 	Password   string `json:"password" binding:"required"`
 }
 

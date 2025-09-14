@@ -54,6 +54,8 @@ func SetupRoutes() *gin.Engine {
 		protectedGroup.GET("/auth/me", authController.GetCurrentUser)
 		protectedGroup.PUT("/auth/mongodb-uri", authController.UpdateMongoURI)
 		protectedGroup.POST("/auth/test-mongodb", authController.TestMongoConnection)
+		protectedGroup.POST("/auth/set-password", authController.SetPassword)
+		protectedGroup.POST("/auth/change-password", authController.ChangePassword)
 
 		protectedGroup.GET("/notifications", notificationController.GetNotifications)
 		protectedGroup.PUT("/notifications/:id/read", notificationController.MarkAsRead)

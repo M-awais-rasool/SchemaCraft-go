@@ -55,3 +55,12 @@ type UpdateMongoURIRequest struct {
 type GoogleAuthRequest struct {
 	IDToken string `json:"id_token" binding:"required"`
 }
+
+type SetPasswordRequest struct {
+	Password string `json:"password" binding:"required,min=6"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=6"`
+}

@@ -14,7 +14,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type DynamicAPIController struct{}
@@ -46,8 +45,41 @@ func (dc *DynamicAPIController) getSchemaByCollection(userID primitive.ObjectID,
 	return &schema, err
 }
 
-// Helper function to filter fields based on visibility
-func (dc *DynamicAPIController) filterPublicFields(data map[string]interface{}, schema *models.Schema) map[string]interface{} {
+// Helper function to create aggregation pipeline for populating relations
+func (dc *DynamicAPIController) createPopulationPipeline(userID primitive.ObjectID, schema *models.Schema, matchFilter bson.M) []bson.M {
+	pipeline := []bson.M{
+		{"$match": matchFilter},
+	}
+
+	// Add $lookup stages for relation fields
+	for _, field := range schema.Fields {
+		if field.Type == "relation" && field.Target != "" {
+			lookupStage := bson.M{
+				"$lookup": bson.M{
+					"from":         field.Target,
+					"localField":   "data." + field.Name,
+					"foreignField": "_id",
+					"as":           "populated_" + field.Name,
+				},
+			}
+			pipeline = append(pipeline, lookupStage)
+
+			// Unwind the array (assuming one-to-one relation, modify for one-to-many if needed)
+			unwindStage := bson.M{
+				"$unwind": bson.M{
+					"path":                       "$populated_" + field.Name,
+					"preserveNullAndEmptyArrays": true,
+				},
+			}
+			pipeline = append(pipeline, unwindStage)
+		}
+	}
+
+	return pipeline
+}
+
+// Helper function to filter fields based on visibility and populate relations
+func (dc *DynamicAPIController) filterPublicFieldsWithRelations(data bson.M, schema *models.Schema) map[string]interface{} {
 	result := make(map[string]interface{})
 
 	// Always include ID and timestamps
@@ -61,11 +93,48 @@ func (dc *DynamicAPIController) filterPublicFields(data map[string]interface{}, 
 		result["updated_at"] = updatedAt
 	}
 
-	// Include public fields only
+	// Include public fields and populate relations
 	for _, field := range schema.Fields {
 		if field.Visibility == "public" {
-			if value, ok := data[field.Name]; ok {
-				result[field.Name] = value
+			if field.Type == "relation" && field.Target != "" {
+				// Get populated relation data
+				if populatedData, ok := data["populated_"+field.Name]; ok {
+					if populatedDoc, ok := populatedData.(bson.M); ok {
+						// Extract only public fields from related document
+						relatedData := make(map[string]interface{})
+						if docData, ok := populatedDoc["data"]; ok {
+							if docDataMap, ok := docData.(bson.M); ok {
+								for key, value := range docDataMap {
+									relatedData[key] = value
+								}
+							}
+						}
+						if relatedID, ok := populatedDoc["_id"]; ok {
+							relatedData["id"] = relatedID
+						}
+						if relatedCreatedAt, ok := populatedDoc["created_at"]; ok {
+							relatedData["created_at"] = relatedCreatedAt
+						}
+						if relatedUpdatedAt, ok := populatedDoc["updated_at"]; ok {
+							relatedData["updated_at"] = relatedUpdatedAt
+						}
+						result[field.Name] = relatedData
+					}
+				} else {
+					// If no relation found, include the raw ID
+					if dataMap, ok := data["data"].(bson.M); ok {
+						if value, ok := dataMap[field.Name]; ok {
+							result[field.Name] = value
+						}
+					}
+				}
+			} else {
+				// Regular field
+				if dataMap, ok := data["data"].(bson.M); ok {
+					if value, ok := dataMap[field.Name]; ok {
+						result[field.Name] = value
+					}
+				}
 			}
 		}
 	}
@@ -127,7 +196,41 @@ func (dc *DynamicAPIController) CreateDocument(c *gin.Context) {
 	docData := make(map[string]interface{})
 	for _, field := range schema.Fields {
 		if value, ok := requestData[field.Name]; ok {
-			docData[field.Name] = value
+			// Validate relation fields
+			if field.Type == "relation" && field.Target != "" {
+				// Convert value to ObjectID for validation
+				var relationID primitive.ObjectID
+				switch v := value.(type) {
+				case string:
+					var err error
+					relationID, err = primitive.ObjectIDFromHex(v)
+					if err != nil {
+						c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid relation ID for field: " + field.Name})
+						return
+					}
+				case primitive.ObjectID:
+					relationID = v
+				default:
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Relation field must be a valid ObjectID: " + field.Name})
+					return
+				}
+
+				// Verify the referenced document exists
+				var count int64
+				count, err = db.Collection(field.Target).CountDocuments(context.TODO(), bson.M{"_id": relationID, "user_id": userID})
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate relation for field: " + field.Name})
+					return
+				}
+				if count == 0 {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Referenced document not found for field: " + field.Name})
+					return
+				}
+
+				docData[field.Name] = relationID
+			} else {
+				docData[field.Name] = value
+			}
 		} else if field.Required {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Required field missing: " + field.Name})
 			return
@@ -209,33 +312,35 @@ func (dc *DynamicAPIController) GetDocuments(c *gin.Context) {
 	}
 	skip := (page - 1) * limit
 
-	// Query options
-	findOptions := options.Find()
-	findOptions.SetLimit(int64(limit))
-	findOptions.SetSkip(int64(skip))
-	findOptions.SetSort(bson.D{{Key: "created_at", Value: -1}})
+	// Create aggregation pipeline with population
+	matchFilter := bson.M{"user_id": userID}
+	pipeline := dc.createPopulationPipeline(userID, schema, matchFilter)
 
-	// Find documents
-	cursor, err := db.Collection(collectionName).Find(context.TODO(), bson.M{"user_id": userID}, findOptions)
+	// Add pagination stages
+	pipeline = append(pipeline,
+		bson.M{"$sort": bson.M{"created_at": -1}},
+		bson.M{"$skip": int64(skip)},
+		bson.M{"$limit": int64(limit)},
+	)
+
+	// Execute aggregation
+	cursor, err := db.Collection(collectionName).Aggregate(context.TODO(), pipeline)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch documents"})
 		return
 	}
 	defer cursor.Close(context.TODO())
 
-	var documents []models.DynamicData
+	var documents []bson.M
 	if err = cursor.All(context.TODO(), &documents); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode documents"})
 		return
 	}
 
-	// Filter public fields only
+	// Filter public fields and populate relations
 	var publicDocuments []map[string]interface{}
 	for _, doc := range documents {
-		publicData := dc.filterPublicFields(doc.Data, schema)
-		publicData["id"] = doc.ID.Hex()
-		publicData["created_at"] = doc.CreatedAt
-		publicData["updated_at"] = doc.UpdatedAt
+		publicData := dc.filterPublicFieldsWithRelations(doc, schema)
 		publicDocuments = append(publicDocuments, publicData)
 	}
 
@@ -303,24 +408,31 @@ func (dc *DynamicAPIController) GetDocumentByID(c *gin.Context) {
 		return
 	}
 
-	// Find document
-	var document models.DynamicData
-	filter := bson.M{"_id": documentID, "user_id": userID}
-	err = db.Collection(collectionName).FindOne(context.TODO(), filter).Decode(&document)
+	// Create aggregation pipeline with population for single document
+	matchFilter := bson.M{"_id": documentID, "user_id": userID}
+	pipeline := dc.createPopulationPipeline(userID, schema, matchFilter)
+
+	// Execute aggregation
+	cursor, err := db.Collection(collectionName).Aggregate(context.TODO(), pipeline)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Document not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
-		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+	defer cursor.Close(context.TODO())
+
+	var documents []bson.M
+	if err = cursor.All(context.TODO(), &documents); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode document"})
 		return
 	}
 
-	// Filter public fields only
-	publicData := dc.filterPublicFields(document.Data, schema)
-	publicData["id"] = document.ID.Hex()
-	publicData["created_at"] = document.CreatedAt
-	publicData["updated_at"] = document.UpdatedAt
+	if len(documents) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Document not found"})
+		return
+	}
+
+	// Filter public fields and populate relations
+	publicData := dc.filterPublicFieldsWithRelations(documents[0], schema)
 
 	c.JSON(http.StatusOK, publicData)
 }
@@ -386,7 +498,41 @@ func (dc *DynamicAPIController) UpdateDocument(c *gin.Context) {
 	updateData := make(map[string]interface{})
 	for _, field := range schema.Fields {
 		if value, ok := requestData[field.Name]; ok {
-			updateData["data."+field.Name] = value
+			// Validate relation fields
+			if field.Type == "relation" && field.Target != "" {
+				// Convert value to ObjectID for validation
+				var relationID primitive.ObjectID
+				switch v := value.(type) {
+				case string:
+					var err error
+					relationID, err = primitive.ObjectIDFromHex(v)
+					if err != nil {
+						c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid relation ID for field: " + field.Name})
+						return
+					}
+				case primitive.ObjectID:
+					relationID = v
+				default:
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Relation field must be a valid ObjectID: " + field.Name})
+					return
+				}
+
+				// Verify the referenced document exists
+				var count int64
+				count, err = db.Collection(field.Target).CountDocuments(context.TODO(), bson.M{"_id": relationID, "user_id": userID})
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate relation for field: " + field.Name})
+					return
+				}
+				if count == 0 {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Referenced document not found for field: " + field.Name})
+					return
+				}
+
+				updateData["data."+field.Name] = relationID
+			} else {
+				updateData["data."+field.Name] = value
+			}
 		}
 	}
 	updateData["updated_at"] = time.Now()

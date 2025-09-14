@@ -106,12 +106,28 @@ func (ac *AuthController) Signup(c *gin.Context) {
 	// Log signup activity
 	go LogActivityWithContext(c, user.ID, models.ActivityTypeAuth, "User signed up", "New user account created", "user", user.ID.Hex(), nil)
 
-	// Remove password from response
-	user.Password = ""
+	// Store password status before removing it (signup users always have password)
+	hasPassword := true
+	user.Password = "" // Remove password from response
 
-	c.JSON(http.StatusCreated, models.LoginResponse{
-		User:  &user,
-		Token: token,
+	c.JSON(http.StatusCreated, gin.H{
+		"user": gin.H{
+			"id":            user.ID.Hex(),
+			"name":          user.Name,
+			"email":         user.Email,
+			"google_id":     user.GoogleID,
+			"api_key":       user.APIKey,
+			"mongodb_uri":   user.MongoDBURI,
+			"database_name": user.DatabaseName,
+			"is_admin":      user.IsAdmin,
+			"is_active":     user.IsActive,
+			"created_at":    user.CreatedAt,
+			"updated_at":    user.UpdatedAt,
+			"last_login":    user.LastLogin,
+			"api_usage":     user.APIUsage,
+			"has_password":  hasPassword,
+		},
+		"token": token,
 	})
 }
 
@@ -141,6 +157,16 @@ func (ac *AuthController) Signin(c *gin.Context) {
 		return
 	}
 
+	// Check if this is a Google user without a password set
+	if user.GoogleID != "" && user.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":                "This email is linked to a Google account. Please sign in with Google, or set up a password for email login.",
+			"google_account":       true,
+			"needs_password_setup": true,
+		})
+		return
+	}
+
 	// Check password
 	if !utils.CheckPassword(req.Password, user.Password) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
@@ -164,12 +190,29 @@ func (ac *AuthController) Signin(c *gin.Context) {
 	// Log login activity
 	go LogActivityWithContext(c, user.ID, models.ActivityTypeLogin, "User signed in", "User logged into account", "user", user.ID.Hex(), nil)
 
-	// Remove password from response
-	user.Password = ""
+	// Store password status before removing it
+	hasPassword := user.Password != ""
+	user.Password = "" // Remove password from response
 
-	c.JSON(http.StatusOK, models.LoginResponse{
-		User:  &user,
-		Token: token,
+	// Send response with custom structure to include has_password
+	c.JSON(http.StatusOK, gin.H{
+		"user": gin.H{
+			"id":            user.ID.Hex(),
+			"name":          user.Name,
+			"email":         user.Email,
+			"google_id":     user.GoogleID,
+			"api_key":       user.APIKey,
+			"mongodb_uri":   user.MongoDBURI,
+			"database_name": user.DatabaseName,
+			"is_admin":      user.IsAdmin,
+			"is_active":     user.IsActive,
+			"created_at":    user.CreatedAt,
+			"updated_at":    user.UpdatedAt,
+			"last_login":    user.LastLogin,
+			"api_usage":     user.APIUsage,
+			"has_password":  hasPassword,
+		},
+		"token": token,
 	})
 }
 
@@ -196,8 +239,29 @@ func (ac *AuthController) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
+	// Store password status before removing it
+	hasPassword := user.Password != ""
 	user.Password = "" // Remove password from response
-	c.JSON(http.StatusOK, user)
+
+	// Add additional info about user's authentication setup
+	response := gin.H{
+		"id":            user.ID.Hex(),
+		"name":          user.Name,
+		"email":         user.Email,
+		"google_id":     user.GoogleID,
+		"api_key":       user.APIKey,
+		"mongodb_uri":   user.MongoDBURI,
+		"database_name": user.DatabaseName,
+		"is_admin":      user.IsAdmin,
+		"is_active":     user.IsActive,
+		"created_at":    user.CreatedAt,
+		"updated_at":    user.UpdatedAt,
+		"last_login":    user.LastLogin,
+		"api_usage":     user.APIUsage,
+		"has_password":  hasPassword, // Indicate if user has password set
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // @Summary Update MongoDB URI
@@ -351,6 +415,149 @@ func (ac *AuthController) TestMongoConnection(c *gin.Context) {
 	})
 }
 
+// @Summary Set password for Google users
+// @Description Allow Google users to set a password for email login (only if they don't have one)
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body models.SetPasswordRequest true "Password data"
+// @Success 200 "Success"
+// @Failure 400 "Bad Request"
+// @Failure 401 "Unauthorized"
+// @Failure 500 "Internal Server Error"
+// @Router /auth/set-password [post]
+func (ac *AuthController) SetPassword(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req models.SetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user information
+	var user models.User
+	err := config.DB.Collection("users").FindOne(context.TODO(), bson.M{"_id": userID}).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Only allow Google users without passwords to set a password
+	if user.GoogleID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "This feature is only available for Google account users"})
+		return
+	}
+
+	if user.Password != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Password is already set. Use the change password feature instead"})
+		return
+	}
+
+	// Hash the new password
+	hashedPassword, err := utils.HashPassword(req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	// Update user's password
+	update := bson.M{
+		"$set": bson.M{
+			"password":   hashedPassword,
+			"updated_at": time.Now(),
+		},
+	}
+
+	_, err = config.DB.Collection("users").UpdateOne(context.TODO(), bson.M{"_id": userID}, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set password"})
+		return
+	}
+
+	// Log password set activity
+	go LogActivityWithContext(c, userID.(primitive.ObjectID), models.ActivityTypeSecurity, "Password set", "Password set for Google account", "security", "password_set", nil)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password set successfully! You can now log in with email and password."})
+}
+
+// @Summary Change password
+// @Description Change user password (requires current password for security)
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body models.ChangePasswordRequest true "Password change data"
+// @Success 200 "Success"
+// @Failure 400 "Bad Request"
+// @Failure 401 "Unauthorized"
+// @Failure 500 "Internal Server Error"
+// @Router /auth/change-password [post]
+func (ac *AuthController) ChangePassword(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req models.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user information
+	var user models.User
+	err := config.DB.Collection("users").FindOne(context.TODO(), bson.M{"_id": userID}).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Check if user has a password to change
+	if user.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No password is currently set. Use the set password feature first"})
+		return
+	}
+
+	// Verify current password
+	if !utils.CheckPassword(req.CurrentPassword, user.Password) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Current password is incorrect"})
+		return
+	}
+
+	// Hash the new password
+	hashedPassword, err := utils.HashPassword(req.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	// Update user's password
+	update := bson.M{
+		"$set": bson.M{
+			"password":   hashedPassword,
+			"updated_at": time.Now(),
+		},
+	}
+
+	_, err = config.DB.Collection("users").UpdateOne(context.TODO(), bson.M{"_id": userID}, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to change password"})
+		return
+	}
+
+	// Log password change activity
+	go LogActivityWithContext(c, userID.(primitive.ObjectID), models.ActivityTypeSecurity, "Password changed", "User changed their password", "security", "password_change", nil)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
+}
+
 // GoogleUser represents the user data from Google
 type GoogleUser struct {
 	ID            string `json:"id"`
@@ -428,10 +635,28 @@ func (ac *AuthController) GoogleAuth(c *gin.Context) {
 			return
 		}
 
+		// Store password status before removing it
+		hasPassword := existingUser.Password != ""
 		existingUser.Password = "" // Remove password from response
-		c.JSON(http.StatusOK, models.LoginResponse{
-			User:  &existingUser,
-			Token: token,
+
+		c.JSON(http.StatusOK, gin.H{
+			"user": gin.H{
+				"id":            existingUser.ID.Hex(),
+				"name":          existingUser.Name,
+				"email":         existingUser.Email,
+				"google_id":     existingUser.GoogleID,
+				"api_key":       existingUser.APIKey,
+				"mongodb_uri":   existingUser.MongoDBURI,
+				"database_name": existingUser.DatabaseName,
+				"is_admin":      existingUser.IsAdmin,
+				"is_active":     existingUser.IsActive,
+				"created_at":    existingUser.CreatedAt,
+				"updated_at":    existingUser.UpdatedAt,
+				"last_login":    existingUser.LastLogin,
+				"api_usage":     existingUser.APIUsage,
+				"has_password":  hasPassword,
+			},
+			"token": token,
 		})
 		return
 	} else if err != mongo.ErrNoDocuments {
@@ -450,9 +675,10 @@ func (ac *AuthController) GoogleAuth(c *gin.Context) {
 	nextMonthStart := utils.GetNextMonthStart(now)
 
 	newUser := models.User{
-		ID:        primitive.NewObjectID(),
-		Name:      googleUser.Name,
-		Email:     googleUser.Email,
+		ID:    primitive.NewObjectID(),
+		Name:  googleUser.Name,
+		Email: googleUser.Email,
+		// No password for Google-only users - they can set one later if needed
 		GoogleID:  googleUser.ID,
 		APIKey:    apiKey,
 		IsAdmin:   false,
@@ -480,9 +706,24 @@ func (ac *AuthController) GoogleAuth(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, models.LoginResponse{
-		User:  &newUser,
-		Token: token,
+	c.JSON(http.StatusCreated, gin.H{
+		"user": gin.H{
+			"id":            newUser.ID.Hex(),
+			"name":          newUser.Name,
+			"email":         newUser.Email,
+			"google_id":     newUser.GoogleID,
+			"api_key":       newUser.APIKey,
+			"mongodb_uri":   newUser.MongoDBURI,
+			"database_name": newUser.DatabaseName,
+			"is_admin":      newUser.IsAdmin,
+			"is_active":     newUser.IsActive,
+			"created_at":    newUser.CreatedAt,
+			"updated_at":    newUser.UpdatedAt,
+			"last_login":    newUser.LastLogin,
+			"api_usage":     newUser.APIUsage,
+			"has_password":  false, // New Google users don't have password
+		},
+		"token": token,
 	})
 }
 
