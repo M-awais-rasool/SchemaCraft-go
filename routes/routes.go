@@ -100,6 +100,7 @@ func SetupRoutes() *gin.Engine {
 		apiGroup.POST("/:collection/auth/signup", dynamicAuthController.Signup)
 		apiGroup.POST("/:collection/auth/login", dynamicAuthController.Login)
 		apiGroup.GET("/:collection/auth/validate", dynamicAuthController.ValidateToken)
+		apiGroup.GET("/:collection/auth/users", dynamicAuthController.GetAllUsers)
 
 		protectedAPIGroup := apiGroup.Group("")
 		protectedAPIGroup.Use(middleware.DynamicAuthMiddleware())

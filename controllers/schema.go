@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -582,8 +583,20 @@ func (sc *SchemaController) DeleteSchema(c *gin.Context) {
 		return
 	}
 
+	// First, check if the schema being deleted is an auth schema
+	var schemaToDelete models.Schema
+	filter := bson.M{"_id": schemaID, "user_id": userID, "is_active": true}
+	err = config.DB.Collection("schemas").FindOne(context.TODO(), filter).Decode(&schemaToDelete)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Schema not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find schema"})
+		}
+		return
+	}
+
 	// Soft delete - mark as inactive
-	filter := bson.M{"_id": schemaID, "user_id": userID}
 	update := bson.M{"$set": bson.M{"is_active": false, "updated_at": time.Now()}}
 
 	result, err := config.DB.Collection("schemas").UpdateOne(context.TODO(), filter, update)
@@ -595,6 +608,40 @@ func (sc *SchemaController) DeleteSchema(c *gin.Context) {
 	if result.MatchedCount == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Schema not found"})
 		return
+	}
+
+	// If this was an auth schema, remove endpoint protection from all other schemas by this user
+	if schemaToDelete.AuthConfig != nil && schemaToDelete.AuthConfig.Enabled {
+		// Find all other active schemas by this user that have endpoint protection
+		protectedSchemasFilter := bson.M{
+			"user_id":   userID,
+			"is_active": true,
+			"_id":       bson.M{"$ne": schemaID}, // Exclude the deleted schema
+			"$or": []bson.M{
+				{"endpoint_protection.get": true},
+				{"endpoint_protection.post": true},
+				{"endpoint_protection.put": true},
+				{"endpoint_protection.delete": true},
+			},
+		}
+
+		// Remove endpoint protection from those schemas
+		removeProtectionUpdate := bson.M{
+			"$set": bson.M{
+				"endpoint_protection": nil,
+				"updated_at":          time.Now(),
+			},
+		}
+
+		_, err = config.DB.Collection("schemas").UpdateMany(
+			context.TODO(),
+			protectedSchemasFilter,
+			removeProtectionUpdate,
+		)
+		if err != nil {
+			// Log the error but don't fail the delete operation
+			fmt.Printf("Warning: Failed to remove endpoint protection from related schemas: %v\n", err)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Schema deleted successfully"})

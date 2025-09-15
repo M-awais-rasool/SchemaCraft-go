@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/M-awais-rasool/SchemaCraft-go/config"
@@ -54,9 +55,26 @@ func (dc *DynamicAPIController) createPopulationPipeline(userID primitive.Object
 	// Add $lookup stages for relation fields
 	for _, field := range schema.Fields {
 		if field.Type == "relation" && field.Target != "" {
+			// Check if the target collection is an authentication schema
+			var targetSchema models.Schema
+			targetSchemaFilter := bson.M{"user_id": userID, "collection_name": field.Target, "is_active": true}
+			err := config.DB.Collection("schemas").FindOne(context.TODO(), targetSchemaFilter).Decode(&targetSchema)
+
+			var targetCollection string
+			if err == nil && targetSchema.AuthConfig != nil && targetSchema.AuthConfig.Enabled {
+				// This is an authentication collection, use the user collection
+				targetCollection = targetSchema.AuthConfig.UserCollection
+				if targetCollection == "" {
+					targetCollection = field.Target + "_users"
+				}
+			} else {
+				// Regular data collection
+				targetCollection = field.Target
+			}
+
 			lookupStage := bson.M{
 				"$lookup": bson.M{
-					"from":         field.Target,
+					"from":         targetCollection,
 					"localField":   "data." + field.Name,
 					"foreignField": "_id",
 					"as":           "populated_" + field.Name,
@@ -79,7 +97,7 @@ func (dc *DynamicAPIController) createPopulationPipeline(userID primitive.Object
 }
 
 // Helper function to filter fields based on visibility and populate relations
-func (dc *DynamicAPIController) filterPublicFieldsWithRelations(data bson.M, schema *models.Schema) map[string]interface{} {
+func (dc *DynamicAPIController) filterPublicFieldsWithRelations(data bson.M, schema *models.Schema, userID primitive.ObjectID) map[string]interface{} {
 	result := make(map[string]interface{})
 
 	// Always include ID and timestamps
@@ -100,15 +118,34 @@ func (dc *DynamicAPIController) filterPublicFieldsWithRelations(data bson.M, sch
 				// Get populated relation data
 				if populatedData, ok := data["populated_"+field.Name]; ok {
 					if populatedDoc, ok := populatedData.(bson.M); ok {
-						// Extract only public fields from related document
+						// Check if the target is an authentication collection
+						var targetSchema models.Schema
+						targetSchemaFilter := bson.M{"user_id": userID, "collection_name": field.Target, "is_active": true}
+						err := config.DB.Collection("schemas").FindOne(context.TODO(), targetSchemaFilter).Decode(&targetSchema)
+
 						relatedData := make(map[string]interface{})
-						if docData, ok := populatedDoc["data"]; ok {
-							if docDataMap, ok := docData.(bson.M); ok {
-								for key, value := range docDataMap {
+
+						if err == nil && targetSchema.AuthConfig != nil && targetSchema.AuthConfig.Enabled {
+							// This is an authentication collection - data is stored directly in the document
+							for key, value := range populatedDoc {
+								// Skip internal fields and password fields
+								if key != "_id" && key != "created_at" && key != "updated_at" &&
+									!strings.Contains(strings.ToLower(key), "password") {
 									relatedData[key] = value
 								}
 							}
+						} else {
+							// Regular data collection - data is in the "data" field
+							if docData, ok := populatedDoc["data"]; ok {
+								if docDataMap, ok := docData.(bson.M); ok {
+									for key, value := range docDataMap {
+										relatedData[key] = value
+									}
+								}
+							}
 						}
+
+						// Always include ID and timestamps
 						if relatedID, ok := populatedDoc["_id"]; ok {
 							relatedData["id"] = relatedID
 						}
@@ -118,6 +155,7 @@ func (dc *DynamicAPIController) filterPublicFieldsWithRelations(data bson.M, sch
 						if relatedUpdatedAt, ok := populatedDoc["updated_at"]; ok {
 							relatedData["updated_at"] = relatedUpdatedAt
 						}
+
 						result[field.Name] = relatedData
 					}
 				} else {
@@ -217,7 +255,24 @@ func (dc *DynamicAPIController) CreateDocument(c *gin.Context) {
 
 				// Verify the referenced document exists
 				var count int64
-				count, err = db.Collection(field.Target).CountDocuments(context.TODO(), bson.M{"_id": relationID, "user_id": userID})
+
+				// Check if the target collection is an authentication schema
+				var targetSchema models.Schema
+				targetSchemaFilter := bson.M{"user_id": userID, "collection_name": field.Target, "is_active": true}
+				err = config.DB.Collection("schemas").FindOne(context.TODO(), targetSchemaFilter).Decode(&targetSchema)
+
+				if err == nil && targetSchema.AuthConfig != nil && targetSchema.AuthConfig.Enabled {
+					// This is an authentication collection, check in the user collection
+					userCollection := targetSchema.AuthConfig.UserCollection
+					if userCollection == "" {
+						userCollection = field.Target + "_users"
+					}
+					count, err = db.Collection(userCollection).CountDocuments(context.TODO(), bson.M{"_id": relationID})
+				} else {
+					// Regular data collection, check with user_id filter
+					count, err = db.Collection(field.Target).CountDocuments(context.TODO(), bson.M{"_id": relationID, "user_id": userID})
+				}
+
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate relation for field: " + field.Name})
 					return
@@ -340,7 +395,7 @@ func (dc *DynamicAPIController) GetDocuments(c *gin.Context) {
 	// Filter public fields and populate relations
 	var publicDocuments []map[string]interface{}
 	for _, doc := range documents {
-		publicData := dc.filterPublicFieldsWithRelations(doc, schema)
+		publicData := dc.filterPublicFieldsWithRelations(doc, schema, userID)
 		publicDocuments = append(publicDocuments, publicData)
 	}
 
@@ -432,7 +487,7 @@ func (dc *DynamicAPIController) GetDocumentByID(c *gin.Context) {
 	}
 
 	// Filter public fields and populate relations
-	publicData := dc.filterPublicFieldsWithRelations(documents[0], schema)
+	publicData := dc.filterPublicFieldsWithRelations(documents[0], schema, userID)
 
 	c.JSON(http.StatusOK, publicData)
 }
@@ -519,7 +574,24 @@ func (dc *DynamicAPIController) UpdateDocument(c *gin.Context) {
 
 				// Verify the referenced document exists
 				var count int64
-				count, err = db.Collection(field.Target).CountDocuments(context.TODO(), bson.M{"_id": relationID, "user_id": userID})
+
+				// Check if the target collection is an authentication schema
+				var targetSchema models.Schema
+				targetSchemaFilter := bson.M{"user_id": userID, "collection_name": field.Target, "is_active": true}
+				err = config.DB.Collection("schemas").FindOne(context.TODO(), targetSchemaFilter).Decode(&targetSchema)
+
+				if err == nil && targetSchema.AuthConfig != nil && targetSchema.AuthConfig.Enabled {
+					// This is an authentication collection, check in the user collection
+					userCollection := targetSchema.AuthConfig.UserCollection
+					if userCollection == "" {
+						userCollection = field.Target + "_users"
+					}
+					count, err = db.Collection(userCollection).CountDocuments(context.TODO(), bson.M{"_id": relationID})
+				} else {
+					// Regular data collection, check with user_id filter
+					count, err = db.Collection(field.Target).CountDocuments(context.TODO(), bson.M{"_id": relationID, "user_id": userID})
+				}
+
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate relation for field: " + field.Name})
 					return

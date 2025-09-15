@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -479,5 +481,123 @@ func (dac *DynamicAuthController) ValidateToken(c *gin.Context) {
 		"user_id":    claims.SchemaUserID.Hex(),
 		"collection": claims.Collection,
 		"expires_at": claims.ExpiresAt,
+	})
+}
+
+// @Summary Get All Users
+// @Description Get all users from the authentication collection
+// @Tags dynamic-auth
+// @Produce json
+// @Security ApiKeyAuth
+// @Param collection path string true "Collection name"
+// @Param page query int false "Page number (default: 1)"
+// @Param limit query int false "Items per page (default: 10, max: 100)"
+// @Success 200 "Success"
+// @Failure 401 "Unauthorized"
+// @Failure 404 "Not Found"
+// @Failure 500 "Internal Server Error"
+// @Router /api/{collection}/auth/users [get]
+func (dac *DynamicAuthController) GetAllUsers(c *gin.Context) {
+	collection := c.Param("collection")
+
+	apiUserID, exists := c.Get("api_user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	userID := apiUserID.(primitive.ObjectID)
+
+	// Get authentication configuration
+	schema, err := dac.getAuthConfig(userID, collection)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Authentication not configured for this collection"})
+		return
+	}
+
+	// Get user's database
+	db, err := dac.getUserDatabase(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
+	}
+
+	// Parse pagination parameters
+	page := 1
+	limit := 10
+
+	if pageStr := c.Query("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+
+	// Calculate skip
+	skip := (page - 1) * limit
+
+	// Get user collection name
+	userCollection := schema.AuthConfig.UserCollection
+	if userCollection == "" {
+		userCollection = collection + "_users"
+	}
+
+	// Count total documents
+	totalCount, err := db.Collection(userCollection).CountDocuments(context.TODO(), bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count users"})
+		return
+	}
+
+	// Find users with pagination
+	findOptions := options.Find()
+	findOptions.SetSkip(int64(skip))
+	findOptions.SetLimit(int64(limit))
+	findOptions.SetSort(bson.D{{Key: "created_at", Value: -1}}) // Sort by newest first
+
+	cursor, err := db.Collection(userCollection).Find(context.TODO(), bson.M{}, findOptions)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
+		return
+	}
+	defer cursor.Close(context.TODO())
+
+	var users []map[string]interface{}
+	for cursor.Next(context.TODO()) {
+		var user bson.M
+		if err := cursor.Decode(&user); err != nil {
+			continue
+		}
+
+		// Filter response fields and remove password
+		filteredUser := dac.filterResponseFields(user, schema.AuthConfig.ResponseFields)
+
+		// Ensure ID is included
+		if id, exists := user["_id"]; exists {
+			filteredUser["id"] = id.(primitive.ObjectID).Hex()
+		}
+
+		users = append(users, filteredUser)
+	}
+
+	if err := cursor.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error reading users"})
+		return
+	}
+
+	// Calculate total pages
+	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":        users,
+		"total":       totalCount,
+		"page":        page,
+		"limit":       limit,
+		"total_pages": totalPages,
 	})
 }

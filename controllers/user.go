@@ -38,7 +38,6 @@ func (uc *UserController) GetDashboard(c *gin.Context) {
 		return
 	}
 
-	// Get user info
 	var user models.User
 	err := config.DB.Collection("users").FindOne(context.TODO(), bson.M{"_id": userID}).Decode(&user)
 	if err != nil {
@@ -46,7 +45,6 @@ func (uc *UserController) GetDashboard(c *gin.Context) {
 		return
 	}
 
-	// Get user's schemas count
 	schemaCount, err := config.DB.Collection("schemas").CountDocuments(
 		context.TODO(),
 		bson.M{"user_id": userID, "is_active": true},
@@ -55,7 +53,6 @@ func (uc *UserController) GetDashboard(c *gin.Context) {
 		schemaCount = 0
 	}
 
-	// Get user's schemas
 	cursor, err := config.DB.Collection("schemas").Find(
 		context.TODO(),
 		bson.M{"user_id": userID, "is_active": true},
@@ -71,7 +68,6 @@ func (uc *UserController) GetDashboard(c *gin.Context) {
 		schemas = []models.Schema{}
 	}
 
-	// Get recent activities (last 5)
 	activityCursor, err := config.DB.Collection("activities").Find(
 		context.TODO(),
 		bson.M{"user_id": userID},
@@ -122,14 +118,12 @@ func (uc *UserController) RegenerateAPIKey(c *gin.Context) {
 		return
 	}
 
-	// Generate new API key
 	newAPIKey, err := utils.GenerateAPIKey()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate API key"})
 		return
 	}
 
-	// Update user's API key
 	filter := bson.M{"_id": userID}
 	update := bson.M{"$set": bson.M{"api_key": newAPIKey}}
 
@@ -139,7 +133,6 @@ func (uc *UserController) RegenerateAPIKey(c *gin.Context) {
 		return
 	}
 
-	// Log API key regeneration activity
 	go LogActivityWithContext(c, userID.(primitive.ObjectID), models.ActivityTypeSecurity, "Generated new API key", "API key regenerated for security", "api_key", "", nil)
 
 	c.JSON(http.StatusOK, gin.H{
@@ -193,14 +186,11 @@ func (uc *UserController) GetAPIUsage(c *gin.Context) {
 // @Failure 500 "Internal Server Error"
 // @Router /user/api-docs [get]
 func (uc *UserController) GetAPIDocumentation(c *gin.Context) {
-	// Try to get user ID from JWT middleware first
 	userID, exists := c.Get("user_id")
 
-	// If not found in context, try to get from query parameter (for direct access)
 	if !exists {
 		token := c.Query("token")
 		if token != "" {
-			// Validate the token manually
 			claims, err := utils.ValidateJWT(token)
 			if err != nil {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
@@ -213,7 +203,6 @@ func (uc *UserController) GetAPIDocumentation(c *gin.Context) {
 		}
 	}
 
-	// Get user info
 	var user models.User
 	err := config.DB.Collection("users").FindOne(context.TODO(), bson.M{"_id": userID}).Decode(&user)
 	if err != nil {
@@ -221,7 +210,6 @@ func (uc *UserController) GetAPIDocumentation(c *gin.Context) {
 		return
 	}
 
-	// Get user's schemas
 	cursor, err := config.DB.Collection("schemas").Find(
 		context.TODO(),
 		bson.M{"user_id": userID, "is_active": true},
@@ -237,7 +225,6 @@ func (uc *UserController) GetAPIDocumentation(c *gin.Context) {
 		schemas = []models.Schema{}
 	}
 
-	// Build API documentation data
 	scheme := getScheme(c)
 	apiDoc := gin.H{
 		"swagger": "2.0",
@@ -272,19 +259,15 @@ func (uc *UserController) GetAPIDocumentation(c *gin.Context) {
 		"schemas":     schemas,
 	}
 
-	// Generate path documentation for each schema
 	paths := gin.H{}
 	definitions := gin.H{}
 
 	for _, schema := range schemas {
 		collectionName := schema.CollectionName
 
-		// Add schema definition
 		definitions[collectionName] = buildSchemaForCollection(schema)
 
-		// Add authentication endpoints if auth is enabled
 		if schema.AuthConfig != nil && schema.AuthConfig.Enabled {
-			// Add auth signup/login/validate endpoints
 			paths["/"+collectionName+"/auth/signup"] = gin.H{
 				"post": gin.H{
 					"summary":     "Sign up for " + collectionName,
@@ -378,6 +361,52 @@ func (uc *UserController) GetAPIDocumentation(c *gin.Context) {
 				},
 			}
 
+			paths["/"+collectionName+"/auth/users"] = gin.H{
+				"get": gin.H{
+					"summary":     "Get all users from " + collectionName,
+					"description": "Retrieve all users from the " + collectionName + " authentication system",
+					"tags":        []string{collectionName + " Auth"},
+					"parameters": []gin.H{
+						{
+							"name":        "page",
+							"in":          "query",
+							"type":        "integer",
+							"description": "Page number (default: 1)",
+						},
+						{
+							"name":        "limit",
+							"in":          "query",
+							"type":        "integer",
+							"description": "Items per page (default: 10, max: 100)",
+						},
+					},
+					"responses": gin.H{
+						"200": gin.H{
+							"description": "Users retrieved successfully",
+							"schema": gin.H{
+								"type": "object",
+								"properties": gin.H{
+									"data": gin.H{
+										"type": "array",
+										"items": gin.H{
+											"type":        "object",
+											"description": "User data according to your schema response fields",
+										},
+									},
+									"total":       gin.H{"type": "integer"},
+									"page":        gin.H{"type": "integer"},
+									"limit":       gin.H{"type": "integer"},
+									"total_pages": gin.H{"type": "integer"},
+								},
+							},
+						},
+						"401": gin.H{"description": "Unauthorized"},
+						"404": gin.H{"description": "Authentication not configured"},
+						"500": gin.H{"description": "Internal Server Error"},
+					},
+				},
+			}
+
 			// Update security definitions to include Bearer auth
 			securityDefs := apiDoc["securityDefinitions"].(gin.H)
 			securityDefs["BearerAuth"] = gin.H{
@@ -386,8 +415,12 @@ func (uc *UserController) GetAPIDocumentation(c *gin.Context) {
 				"in":          "header",
 				"description": "Bearer token for authenticated requests. Format: Bearer {token}",
 			}
+
+			// Skip CRUD endpoints for auth-only schemas - only show auth endpoints
+			continue
 		}
 
+		// Add CRUD endpoints only for non-auth schemas
 		// GET /api/{collection}
 		getEndpoint := gin.H{
 			"summary":     "Get all " + collectionName,
