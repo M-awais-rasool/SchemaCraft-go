@@ -229,13 +229,9 @@ func (uc *UserController) GetAPIDocumentation(c *gin.Context) {
 	apiDoc := gin.H{
 		"swagger": "2.0",
 		"info": gin.H{
-			"title":       "Your SchemaCraft API",
-			"description": "Personal API documentation for your dynamic schemas",
-			"version":     "1.0",
-			"contact": gin.H{
-				"name":  user.Name,
-				"email": user.Email,
-			},
+			"title":       "",
+			"description": "",
+			"version":     "",
 		},
 		"host":     c.Request.Host,
 		"basePath": "/api",
@@ -754,6 +750,7 @@ func (uc *UserController) GetSwaggerUI(c *gin.Context) {
     <meta charset="UTF-8">
     <title>` + user.Name + ` - API Documentation</title>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         html {
             box-sizing: border-box;
@@ -766,32 +763,200 @@ func (uc *UserController) GetSwaggerUI(c *gin.Context) {
         body {
             margin:0;
             background: #fafafa;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         }
         .info {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
+            position: relative;
+            overflow: hidden;
             color: white;
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 0;
+            margin-bottom: 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
-        .info h1 {
-            margin: 0 0 10px 0;
-            font-size: 2em;
+        .info::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.03)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.03)"/><circle cx="50" cy="10" r="0.5" fill="rgba(255,255,255,0.02)"/><circle cx="20" cy="80" r="0.5" fill="rgba(255,255,255,0.02)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            pointer-events: none;
         }
-        .info p {
+        .header-container {
+            position: relative;
+            z-index: 1;
+            padding: 32px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .header-left {
+            flex: 1;
+            min-width: 300px;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+        }
+        .header-title {
             margin: 0;
-            opacity: 0.9;
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ffffff, #e2e8f0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.2;
+        }
+        .header-subtitle {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 400;
+            color: #cbd5e1;
+            line-height: 1.4;
+        }
+        .api-key-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 16px 20px;
+            min-width: 300px;
+        }
+        .api-key-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .api-key-value {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 14px;
+            color: #e2e8f0;
+            word-break: break-all;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .api-key-value:hover {
+            background: rgba(15, 23, 42, 0.8);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        .copy-indicator {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #22c55e;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .status-badge {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        @media (max-width: 768px) {
+            .header-container {
+                padding: 24px 20px;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .header-right {
+                width: 100%;
+            }
+            .api-key-container {
+                min-width: 100%;
+            }
+            .header-title {
+                font-size: 24px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="info">
-        <h1>` + user.Name + `'s Personal API</h1>
-        <p>Interactive documentation for your dynamic API endpoints</p>
-        <p><strong>API Key:</strong> <code>` + user.APIKey + `</code></p>
+        <div class="header-container">
+            <div class="header-left">
+                <div class="logo-section">
+                    <div class="logo-icon">` + string(user.Name[0]) + `</div>
+                    <div>
+                        <h1 class="header-title">` + user.Name + `'s Personal API</h1>
+                        <p class="header-subtitle">Interactive documentation for your dynamic API endpoints</p>
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="status-badge">Active</div>
+                <div class="api-key-container">
+                    <span class="api-key-label">API Key</span>
+                    <div class="api-key-value" onclick="copyToClipboard('` + user.APIKey + `')" title="Click to copy">
+                        ` + user.APIKey + `
+                        <span class="copy-indicator" id="copyIndicator">Copied!</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     <div id="swagger-ui"></div>
     <script src="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-bundle.js"></script>
     <script>
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                const indicator = document.getElementById('copyIndicator');
+                indicator.style.opacity = '1';
+                setTimeout(() => {
+                    indicator.style.opacity = '0';
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Failed to copy text: ', err);
+            });
+        }
+
         SwaggerUIBundle({
             url: '` + swaggerSpecURL + `',
             dom_id: '#swagger-ui',
