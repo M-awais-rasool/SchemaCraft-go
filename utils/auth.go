@@ -85,7 +85,6 @@ func GenerateAPIKey() (string, error) {
 }
 
 func GenerateSecurePassword() (string, error) {
-	// Generate a 16-character secure password with mix of letters, numbers, and symbols
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
 	bytes := make([]byte, 16)
 	if _, err := rand.Read(bytes); err != nil {
